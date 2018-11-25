@@ -40,16 +40,22 @@ init_number(VALUE* v, const char* data, size_t data_size)
             &is_int32_compatible, &is_uint32_compatible,
             &is_int64_compatible, &is_uint64_compatible);
 
-    if(is_int32_compatible)
+    if(is_int32_compatible) {
         return value_init_int32(v, json_number_to_int32(data, data_size));
-    else if(is_uint32_compatible)
+    } else if(is_uint32_compatible) {
         return value_init_uint32(v, json_number_to_uint32(data, data_size));
-    else if(is_int64_compatible)
+    } else if(is_int64_compatible) {
         return value_init_int64(v, json_number_to_int64(data, data_size));
-    else if(is_uint64_compatible)
+    } else if(is_uint64_compatible) {
         return value_init_uint64(v, json_number_to_uint64(data, data_size));
-    else
-        return value_init_double(v, json_number_to_double(data, data_size));
+    } else {
+        double d;
+        int err;
+        err = json_number_to_double(data, data_size, &d);
+        if(err != 0)
+            return err;
+        return value_init_double(v, d);
+    }
 }
 
 static int

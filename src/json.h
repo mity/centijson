@@ -252,12 +252,15 @@ void json_analyze_number(const char* num, size_t num_size,
  *
  * Note the conversion to any of the integer types is undefined unless
  * json_analyze_number() says it is fine.
+ *
+ * And also note that json_number_to_double() can fail with JSON_ERR_OUTOFMEMORY.
+ * Hence it prototype differs.
  */
 int32_t json_number_to_int32(const char* num, size_t num_size);
 uint32_t json_number_to_uint32(const char* num, size_t num_size);
 int64_t json_number_to_int64(const char* num, size_t num_size);
 uint64_t json_number_to_uint64(const char* num, size_t num_size);
-double json_number_to_double(const char* num, size_t num_size);
+int json_number_to_double(const char* num, size_t num_size, double* p_result);
 
 
 #ifdef __cplusplus

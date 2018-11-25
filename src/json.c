@@ -25,8 +25,9 @@
 
 #include "json.h"
 
+#include <locale.h>     /* :-( Needed for json_number_to_double() */
 #include <string.h>
-#include <float.h>      /* DBL_MIN, DBL_MAX */
+#include <stdlib.h>
 
 
 #ifdef _MSC_VER
@@ -921,83 +922,66 @@ json_number_to_uint64(const char* num, size_t num_size)
     return val;
 }
 
-double
-json_number_to_double(const char* num, size_t num_size)
+int
+json_number_to_double(const char* num, size_t num_size, double* p_result)
 {
-    /* Yes, I know. Parsing this by hand is so ugly. And likely suboptimal when
-     * it comes both to precision and to speed.
+    struct lconv* locale_info;
+    char local_buffer[64];
+    char* buffer;
+    double d;
+
+    /* Unfortunately, AFAIK, there is no reasonably easy portable way how to
+     * construct float or double by hand.
      *
-     * But we cannot use standard strtod() or sscanf() here because those
-     * functions are locale dependent. And playing with locale in a (portable)
-     * library is straight route to the hell.
+     * The closest to that ideal is likely strtod() function (mandated by
+     * the C89/90 standard, so hopefully, it is practically everywhere).
      *
-     * Any idea how to rewrite this into anything more sensible is welcome.
+     * However strtod() has (for us) two strong disadvantages we have to deal
+     * with.
+     *
+     * (1) It expects the string terminated by '\0' which we do not have here.
+     *
+     * (2) Instead of decimal period '.', it may expect other character as
+     *     specified by the current locale.
+     *
+     *     That is an issue on its own since, on some platforms a locale is
+     *     an attribute of thread; on other platforms it is a an attribute
+     *     of process. Some platforms even have some hybrid solution.
+     *
+     *     This means, we (as a library) cannot afford changing the locale to
+     *     "C", even temporarily.
+     *
+     * So instead we have to create new string in a temp. buffer following
+     * those requirements.
      */
 
-    size_t off = 0;
-    int is_neg = 0;
-    double val = 0.0;
-
-    if(num[off] == '-') {
-        is_neg = 1;
-        off++;
+    if(num_size + 1 < sizeof(local_buffer)) {
+        /* The number is short enough so we can avoid heap allocation. */
+        buffer = local_buffer;
+    } else {
+        buffer = (char*) malloc(num_size + 1);
+        if(buffer == NULL)
+            return JSON_ERR_OUTOFMEMORY;
     }
 
-    /* Integer part. */
-    while(off < num_size  &&  IS_DIGIT(num[off])) {
-        val *= 10.0;
-        val += (double)(num[off++] - '0');
+    /* Make sure the string is zero-terminated. */
+    memcpy(buffer, num, num_size);
+    buffer[num_size] = '\0';
+
+    /* Make sure we use the locale-dependent decimal point. */
+    locale_info = localeconv();
+    if(locale_info->decimal_point[0] != '.') {
+        char* fp;
+
+        fp = strchr(buffer, '.');
+        if(fp != NULL)
+            *fp = locale_info->decimal_point[0];
     }
 
-    /* Fraction part. */
-    if(off < num_size  &&  num[off] == '.') {
-        double factor = 0.1;
+    *p_result = strtod(buffer, NULL);
 
-        off++;  /* skip '.' */
-
-        while(off < num_size  &&  IS_DIGIT(num[off])) {
-            val += (double)(num[off++] - '0') * factor;
-            factor *= 0.1;
-        }
-    }
-
-    if(is_neg)
-        val = -val;
-
-    /* Exponent */
-    if(off < num_size  &&  (num[off] == 'e' || num[off] == 'E')) {
-        int exp_is_neg = 0;
-        unsigned exp = 0;
-
-        off++;  /* skip 'E' */
-
-        if(num[off] == '-') {
-            exp_is_neg = 1;
-            off++;
-        } else if(num[off] == '+') {
-            off++;
-        }
-
-        while(off < num_size  &&  IS_DIGIT(num[off])) {
-            exp *= 10;
-            exp += num[off++] - '0';
-        }
-
-        /* `pow(10, (is_neg ? -exp : exp))` looks easier but it would require
-         * <math.h> and -lm. */
-        if(exp_is_neg) {
-            if(exp >= 512)      return 0.0;                 /* Could not fit in double anyway. */
-            while(exp >= 64)    { val /= 1e64; exp -= 64; }
-            while(exp >= 8)     { val /= 1e8; exp -= 8; }
-            while(exp >= 1)     { val /= 1e1; exp -= 1; }
-        } else {
-            if(exp >= 512)      return (is_neg ? DBL_MIN : DBL_MAX);    /* ditto */
-            while(exp >= 64)    { val *= 1e64; exp -= 64; }
-            while(exp >= 8)     { val *= 1e8; exp -= 8; }
-            while(exp >= 1)     { val *= 1e1; exp -= 1; }
-        }
-    }
-
-    return val;
+    if(buffer != local_buffer)
+        free(buffer);
+    return 0;
 }
 
