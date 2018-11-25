@@ -25,9 +25,10 @@
 
 #include "json.h"
 
-#include <locale.h>     /* :-( Needed for json_number_to_double() */
-#include <string.h>
+#include <locale.h>     /* localeconv() */
+#include <stdio.h>      /* snprintf() */
 #include <stdlib.h>
+#include <string.h>
 
 
 #ifdef _MSC_VER
@@ -36,6 +37,9 @@
     #ifndef __cplusplus
         #define inline __inline
     #endif
+
+    /* Older MSVC versions do not have snprintf() but _snprintf(). */
+    #define snprintf _snprintf
 #endif
 
 
@@ -928,7 +932,6 @@ json_number_to_double(const char* num, size_t num_size, double* p_result)
     struct lconv* locale_info;
     char local_buffer[64];
     char* buffer;
-    double d;
 
     /* Unfortunately, AFAIK, there is no reasonably easy portable way how to
      * construct float or double by hand.
@@ -985,3 +988,221 @@ json_number_to_double(const char* num, size_t num_size, double* p_result)
     return 0;
 }
 
+
+int
+json_dump_int32(int32_t i32, int (*write_func)(const char*, size_t, void*), void* user_data)
+{
+    return json_dump_int64(i32, write_func, user_data);
+}
+
+int
+json_dump_uint32(uint32_t u32, int (*write_func)(const char*, size_t, void*), void* user_data)
+{
+    return json_dump_uint64(u32, write_func, user_data);
+}
+
+int
+json_dump_int64(int64_t i64, int (*write_func)(const char*, size_t, void*), void* user_data)
+{
+    char buffer[32];
+    size_t off = sizeof(buffer);
+    int is_neg = (i64 < 0);
+
+    while(i64 != 0) {
+        buffer[--off] = '0' + (i64 % 10);
+        i64 /= 10;
+    }
+
+    if(is_neg)
+        buffer[--off] = '-';
+
+    return write_func(buffer + off, sizeof(buffer) - off, user_data);
+}
+
+int
+json_dump_uint64(uint64_t u64, int (*write_func)(const char*, size_t, void*), void* user_data)
+{
+    char buffer[32];
+    size_t off = sizeof(buffer);
+
+    while(u64 != 0) {
+        buffer[--off] = '0' + (u64 % 10);
+        u64 /= 10;
+    }
+
+    return write_func(buffer + off, sizeof(buffer) - off, user_data);
+}
+
+int
+json_dump_double(double d, int (*write_func)(const char*, size_t, void*), void* user_data)
+{
+    static const char fmt[] = "%lg";
+    static const size_t extra_bytes = 4;    /* Space reserved for ".0" */
+    struct lconv* locale_info;
+    int n;
+    char local_buffer[64];
+    size_t capacity = sizeof(local_buffer) - extra_bytes;
+    char* buffer = local_buffer;
+    char* fp;
+    int ret;
+
+    /* First, try the small buffer on the stack. */
+    n = snprintf(local_buffer, capacity, fmt, d);
+    if(n >= capacity) {
+        /* We need larger buffer. So retry the request size. */
+        capacity = n + 1;
+        buffer = (char*) malloc(capacity + extra_bytes);
+        if(buffer == NULL)
+            return JSON_ERR_OUTOFMEMORY;
+
+        n = snprintf(buffer, capacity, fmt, d);
+        if(n >= capacity)
+            n = -1;
+    }
+
+    /* Old snprintf() implementations only report the buffer is too small and
+     * do not tell how much space is needed. So grow the buffer until it is
+     * large enough. */
+    if(n < 0) {
+        capacity = sizeof(local_buffer) * 2;
+
+        /* Make the terrain safe for realloc(). */
+        if(buffer == local_buffer)
+            buffer = NULL;
+
+        while(1) {
+            char* new_buffer;
+
+            new_buffer = realloc(buffer, capacity + extra_bytes);
+            if(new_buffer == NULL) {
+                free(buffer);
+                return JSON_ERR_OUTOFMEMORY;
+            }
+
+            n = snprintf(buffer, capacity, fmt, d);
+            if(n >= 0  &&  n < capacity)
+                break;
+
+            capacity *= 2;
+        }
+    }
+
+    /* Similar pain as above for strtod(). We need to fight with snprintf()
+     * and undo the locale-dependent stuff. */
+    locale_info = localeconv();
+
+    /* If defined by the current locale, remove any thousands separators. */
+    if(locale_info->thousands_sep != NULL  &&  locale_info->thousands_sep[0]) {
+        char* sep = locale_info->thousands_sep;
+        size_t sep_len = strlen(sep);
+        char* ptr = buffer;
+
+        while(1) {
+            ptr = strstr(ptr, sep);
+            if(ptr == NULL)
+                break;
+
+            memmove(ptr, ptr + sep_len, n - (ptr - buffer));
+            n -= sep_len;
+        }
+    }
+
+    /* Fix floating point. */
+    fp = strchr(buffer, locale_info->decimal_point[0]);
+    if(fp != NULL) {
+        *fp = '.';
+    } else if(strchr(buffer, 'e') == 0) {
+        /* There is no decimal point. And there is also no 'e' (i.e. no
+         * scientific notation), i.e. it looks too much as an integer.
+         *
+         * For the sake of consistency, let's make sure that, if we ever
+         * re-read the string again, we shall map it to double again, by
+         * appending the decimal point.
+         *
+         * We may do this safely: We reserved few bytes in malloc()/realloc()
+         * above for this.
+         */
+        memcpy(buffer + n, ".0", 3);
+        n += 2;
+    }
+
+    ret = write_func(buffer, n, user_data);
+
+    if(buffer != local_buffer)
+        free(buffer);
+    return ret;
+}
+
+static void
+json_control_to_hex(char* buf, uint8_t ch)
+{
+    static const char xdigits[] = "0123456789ABCDEF";
+
+    buf[0] = '\\';
+    buf[1] = 'u';
+    buf[2] = '0';
+    buf[3] = '0';
+    buf[4] = xdigits[((ch >> 4) & 0xf)];
+    buf[5] = xdigits[(ch & 0xf)];
+}
+
+int
+json_dump_string(const char* str, size_t size, int (*write_func)(const char*, size_t, void*), void* user_data)
+{
+    size_t off = 0;
+    int ret;
+
+    ret = write_func("\"", 1, user_data);
+    if(ret != 0)
+        return ret;
+
+    while(off < size) {
+        char ch = str[off];
+
+        if(IS_CONTROL(ch)  ||  ch == '\"'  ||  ch == '\\') {
+            char esc_buffer[8];
+            char* esc;
+            size_t esc_size;
+
+            switch(ch) {
+                case '\"':  esc = "\\\""; esc_size = 2; break;
+                case '\\':  esc = "\\\\"; esc_size = 2; break;
+                case '\b':  esc = "\\b"; esc_size = 2; break;
+                case '\f':  esc = "\\f"; esc_size = 2; break;
+                case '\n':  esc = "\\n"; esc_size = 2; break;
+                case '\r':  esc = "\\r"; esc_size = 2; break;
+                case '\t':  esc = "\\t"; esc_size = 2; break;
+
+                default:
+                    json_control_to_hex(esc_buffer, ch);
+                    esc = esc_buffer;
+                    esc_size = 6;
+                    break;
+            }
+
+            ret = write_func(esc, esc_size, user_data);
+            if(ret != 0)
+                return ret;
+
+            off++;
+        } else {
+            size_t off2 = off + 1;
+
+            /* Tight loop for non-control characters. */
+            while(off2 < size  &&  !IS_CONTROL(str[off2])  &&  str[off2] != '\"'  &&  str[off2] != '\\')
+                off2++;
+
+            ret = write_func(str + off, off2 - off, user_data);
+            if(ret != 0)
+                return ret;
+
+            off = off2;
+        }
+    }
+
+    ret = write_func("\"", 1, user_data);
+    if(ret != 0)
+        return ret;
+
+    return 0;
+}

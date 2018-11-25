@@ -83,8 +83,8 @@ deep_dict_cmp(const VALUE* v1, const VALUE* v2)
 
     keys1 = malloc(size * sizeof(const VALUE*));
     keys2 = malloc(size * sizeof(const VALUE*));
-    value_dict_keys(v1, keys1, size);
-    value_dict_keys(v2, keys2, size);
+    value_dict_keys_sorted(v1, keys1, size);
+    value_dict_keys_sorted(v2, keys2, size);
 
     for(i = 0; i < size; i++) {
         string_cmp(keys1[i], keys2[i]);

@@ -837,6 +837,18 @@ value_dict_leftmost_path(RBTREE** path, RBTREE* node)
     return n;
 }
 
+unsigned
+value_dict_flags(const VALUE* v)
+{
+    DICT* d = value_dict_payload((VALUE*) v);
+    unsigned flags = 0;
+
+    if(d != NULL  &&  (v->data[0] & HAS_ORDERLIST))
+        flags |= VALUE_DICT_MAINTAINORDER;
+
+    return flags;
+}
+
 size_t
 value_dict_size(const VALUE* v)
 {
@@ -849,7 +861,7 @@ value_dict_size(const VALUE* v)
 }
 
 size_t
-value_dict_keys(const VALUE* v, const VALUE** buffer, size_t buffer_size)
+value_dict_keys_sorted(const VALUE* v, const VALUE** buffer, size_t buffer_size)
 {
     DICT* d = value_dict_payload((VALUE*) v);
     RBTREE* stack[RBTREE_MAX_HEIGHT];
@@ -866,6 +878,25 @@ value_dict_keys(const VALUE* v, const VALUE** buffer, size_t buffer_size)
         node = stack[--stack_size];
         buffer[n++] = &node->key;
         stack_size += value_dict_leftmost_path(stack + stack_size, node->right);
+    }
+
+    return n;
+}
+
+size_t
+value_dict_keys_ordered(const VALUE* v, const VALUE** buffer, size_t buffer_size)
+{
+    DICT* d = value_dict_payload((VALUE*) v);
+    RBTREE* node;
+    size_t n = 0;
+
+    if(d == NULL  ||  !(v->data[0] & HAS_ORDERLIST))
+        return 0;
+
+    node = d->order_head;
+    while(node != NULL  &&  n < buffer_size) {
+        buffer[n++] = &node->key;
+        node = node->order_next;
     }
 
     return n;

@@ -101,6 +101,26 @@ int json_dom_parse(const char* input, size_t size, const JSON_CONFIG* config,
                    unsigned dom_flags, VALUE* p_root, JSON_INPUT_POS* p_pos);
 
 
+/* Dump recursively all the DOM hierarchy out, via the provided writing
+ * callback.
+ *
+ * The provided writing function must write all the data provided to it
+ * and return zero to indicate success, or non-zero to indicate an error
+ * and abort the operation.
+ *
+ * Returns zero on success, JSON_ERR_OUTOFMEMORY, or an error code returned
+ * from writing callback.
+ */
+#define JSON_DOM_DUMP_MINIMIZE          0x0001  /* Do not indent, do not use no extra whitespace including new lines. */
+#define JSON_DOM_DUMP_FORCECLRF         0x0002  /* Use "\r\n" instead of just "\n". */
+#define JSON_DOM_DUMP_INDENTWITHSPACES  0x0004  /* Indent with `tab_width` spaces instead of with '\t'. */
+#define JSON_DOM_DUMP_PREFERDICTORDER   0x0008  /* Prefer original dictionary order, if possible. */
+
+int json_dom_dump(const VALUE* root,
+                  int (*write_func)(const char*, size_t, void*), void* user_data,
+                  unsigned tab_width, unsigned flags);
+
+
 #ifdef __cplusplus
 }  /* extern "C" { */
 #endif

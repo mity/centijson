@@ -122,8 +122,8 @@ typedef struct JSON_CONFIG {
  */
 typedef struct JSON_INPUT_POS {
     size_t offset;
-    size_t line_number;
-    size_t column_number;
+    unsigned line_number;
+    unsigned column_number;
 } JSON_INPUT_POS;
 
 
@@ -261,6 +261,26 @@ uint32_t json_number_to_uint32(const char* num, size_t num_size);
 int64_t json_number_to_int64(const char* num, size_t num_size);
 uint64_t json_number_to_uint64(const char* num, size_t num_size);
 int json_number_to_double(const char* num, size_t num_size, double* p_result);
+
+
+/* Helpers for writing numbers and strings.
+ * (Given that all the rest is trivial, do it manually ;-)
+ *
+ * Note that json_dump_string() assumes the string is well-formed UTF-8 string.
+ *
+ * The provided writing function must write all the data provided to it
+ * and return zero to indicate success, or non-zero to indicate an error
+ * and abort the operation.
+ *
+ * Returns zero on success, JSON_ERR_OUTOFMEMORY, or an error code returned
+ * from writing callback.
+ */
+int json_dump_int32(int32_t i32, int (*write_func)(const char*, size_t, void*), void* user_data);
+int json_dump_uint32(uint32_t u32, int (*write_func)(const char*, size_t, void*), void* user_data);
+int json_dump_int64(int64_t i64, int (*write_func)(const char*, size_t, void*), void* user_data);
+int json_dump_uint64(uint64_t u64, int (*write_func)(const char*, size_t, void*), void* user_data);
+int json_dump_double(double d, int (*write_func)(const char*, size_t, void*), void* user_data);
+int json_dump_string(const char* str, size_t size, int (*write_func)(const char*, size_t, void*), void* user_data);
 
 
 #ifdef __cplusplus

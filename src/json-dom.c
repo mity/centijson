@@ -210,3 +210,238 @@ json_dom_parse(const char* input, size_t size, const JSON_CONFIG* config,
     return json_dom_fini(&dom_parser, p_root, p_pos);
 }
 
+typedef struct JSON_DOM_DUMP_PARAMS {
+    int (*write_func)(const char*, size_t, void*);
+    void* user_data;
+    unsigned tab_width;
+    unsigned flags;
+} JSON_DOM_DUMP_PARAMS;
+
+static int
+json_dom_dump_indent(unsigned nest_level, JSON_DOM_DUMP_PARAMS* params)
+{
+    static const char tabs[] = "\t\t\t\t\t\t\t\t";
+    static const unsigned n_tabs = sizeof(tabs) - 1;
+    static const char spaces[] = "                                ";
+    static const unsigned n_spaces = sizeof(spaces) - 1;
+
+    unsigned i;
+    unsigned n;
+    unsigned run;
+    const char* str;
+
+    if((params->flags & JSON_DOM_DUMP_MINIMIZE)  ||  nest_level == 0)
+        return 0;
+
+    if(params->flags & JSON_DOM_DUMP_INDENTWITHSPACES) {
+        n = nest_level * params->tab_width;
+        run = n_spaces;
+        str = spaces;
+    } else {
+        n = nest_level;
+        run = n_tabs;
+        str = tabs;
+    }
+
+    for(i = 0; i < n; i += run) {
+        int ret = params->write_func(str, (run > n - i) ? n - i : run, params->user_data);
+        if(ret != 0)
+            return ret;
+    }
+
+    return 0;
+}
+
+static int
+json_dom_dump_newline(JSON_DOM_DUMP_PARAMS* params)
+{
+    if(params->flags & JSON_DOM_DUMP_MINIMIZE)
+        return 0;
+
+    if(params->flags & JSON_DOM_DUMP_FORCECLRF)
+        return params->write_func("\r\n", 2, params->user_data);
+    else
+        return params->write_func("\n", 1, params->user_data);
+}
+
+static int
+json_dom_dump_helper(const VALUE* node, int nest_level,
+                     JSON_DOM_DUMP_PARAMS* params)
+{
+    int ret;
+
+    if(nest_level >= 0) {
+        ret = json_dom_dump_indent(nest_level, params);
+        if(ret != 0)
+            return ret;
+    } else {
+        nest_level = -nest_level;
+    }
+
+    switch(value_type(node)) {
+        case VALUE_NULL:
+            ret = params->write_func("null", 4, params->user_data);
+            break;
+
+        case VALUE_BOOL:
+            if(value_bool(node))
+                ret = params->write_func("true", 4, params->user_data);
+            else
+                ret = params->write_func("false", 5, params->user_data);
+            break;
+
+        case VALUE_INT32:
+            ret = json_dump_int32(value_int32(node),
+                            params->write_func, params->user_data);
+            break;
+
+        case VALUE_UINT32:
+            ret = json_dump_uint32(value_uint32(node),
+                            params->write_func, params->user_data);
+            break;
+
+        case VALUE_INT64:
+            ret = json_dump_int64(value_int64(node),
+                            params->write_func, params->user_data);
+            break;
+
+        case VALUE_UINT64:
+            ret = json_dump_uint64(value_uint64(node),
+                            params->write_func, params->user_data);
+            break;
+
+        case VALUE_FLOAT:
+        case VALUE_DOUBLE:
+            ret = json_dump_double(value_double(node),
+                            params->write_func, params->user_data);
+            break;
+
+        case VALUE_STRING:
+            ret = json_dump_string(value_string(node), value_string_length(node),
+                            params->write_func, params->user_data);
+            break;
+
+        case VALUE_ARRAY:
+        {
+            const VALUE* values;
+            size_t i, n;
+
+            ret = params->write_func("[", 1, params->user_data);
+            if(ret != 0)
+                return ret;
+
+            ret = json_dom_dump_newline(params);
+            if(ret != 0)
+                return ret;
+
+            n = value_array_size(node);
+            values = value_array_get_all(node);
+            for(i = 0; i < n; i++) {
+                ret = json_dom_dump_helper(&values[i], nest_level+1, params);
+                if(ret != 0)
+                    return ret;
+
+                if(i < n - 1) {
+                    ret = params->write_func(",", 1, params->user_data);
+                    if(ret != 0)
+                        return ret;
+                }
+
+                ret = json_dom_dump_newline(params);
+                if(ret != 0)
+                    return ret;
+            }
+
+            ret = json_dom_dump_indent(nest_level, params);
+            if(ret != 0)
+                return ret;
+
+            ret = params->write_func("]", 1, params->user_data);
+            break;
+        }
+
+        case VALUE_DICT:
+        {
+            const VALUE** keys;
+            size_t i, n;
+
+            ret = params->write_func("{", 1, params->user_data);
+            if(ret != 0)
+                return ret;
+
+            ret = json_dom_dump_newline(params);
+            if(ret != 0)
+                return ret;
+
+            n = value_dict_size(node);
+            if(n > 0) {
+                keys = malloc(sizeof(VALUE*) * n);
+                if(keys == NULL)
+                    return JSON_ERR_OUTOFMEMORY;
+
+                if((params->flags & JSON_DOM_DUMP_PREFERDICTORDER)  &&
+                   (value_dict_flags(node) & VALUE_DICT_MAINTAINORDER))
+                    value_dict_keys_ordered(node, keys, n);
+                else
+                    value_dict_keys_sorted(node, keys, n);
+
+                for(i = 0; i < n; i++) {
+                    VALUE* value;
+
+                    ret = json_dom_dump_helper(keys[i], nest_level+1, params);
+                    if(ret != 0)
+                        break;
+                    if(params->flags & JSON_DOM_DUMP_MINIMIZE)
+                        ret = params->write_func(":", 1, params->user_data);
+                    else
+                        ret = params->write_func(": ", 2, params->user_data);
+                    if(ret != 0)
+                        break;
+
+                    value = value_dict_get_(node, value_string(keys[i]), value_string_length(keys[i]));
+                    ret = json_dom_dump_helper(value, -(nest_level+1), params);
+                    if(ret != 0)
+                        break;
+
+                    if(i < n - 1) {
+                        ret = params->write_func(",", 1, params->user_data);
+                        if(ret != 0)
+                            break;
+                    }
+
+                    ret = json_dom_dump_newline(params);
+                    if(ret != 0)
+                        break;
+                }
+
+                free(keys);
+                if(ret != 0)
+                    return ret;
+            }
+
+            ret = json_dom_dump_indent(nest_level, params);
+            if(ret != 0)
+                return ret;
+
+            ret = params->write_func("}", 1, params->user_data);
+            break;
+        }
+    }
+
+    return ret;
+}
+
+int
+json_dom_dump(const VALUE* root, int (*write_func)(const char*, size_t, void*),
+              void* user_data, unsigned tab_width, unsigned flags)
+{
+    JSON_DOM_DUMP_PARAMS params = { write_func, user_data, tab_width, flags };
+    int ret;
+
+    ret = json_dom_dump_helper(root, 0, &params);
+    if(ret != 0)
+        return ret;
+
+    ret = json_dom_dump_newline(&params);
+    return ret;
+}
