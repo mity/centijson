@@ -61,13 +61,13 @@ typedef enum JSON_TYPE {
 #define JSON_ERR_SYNTAX                 (-4)    /* Generic syntax error. (More specific error codes are preferred.) */
 #define JSON_ERR_BADCLOSER              (-5)    /* Mismatch in brackets (e.g. "{ ]" or "[ }") */
 #define JSON_ERR_BADROOTTYPE            (-6)    /* Root type not allowed by CONFIG::flags. */
-#define JSON_ERR_EXPECTEDVALUE          (-7)
-#define JSON_ERR_EXPECTEDKEY            (-8)
-#define JSON_ERR_EXPECTEDVALUEORCLOSER  (-9)
-#define JSON_ERR_EXPECTEDKEYORCLOSER    (-10)
-#define JSON_ERR_EXPECTEDCOLON          (-11)
-#define JSON_ERR_EXPECTEDCOMMAORCLOSER  (-12)
-#define JSON_ERR_EXPECTEDEOF            (-13)
+#define JSON_ERR_EXPECTEDVALUE          (-7)    /* Something unexpected where value has to be. */
+#define JSON_ERR_EXPECTEDKEY            (-8)    /* Something unexpected where key has to be. */
+#define JSON_ERR_EXPECTEDVALUEORCLOSER  (-9)    /* Something unexpected where value or array/object closer has to be. */
+#define JSON_ERR_EXPECTEDKEYORCLOSER    (-10)   /* Something unexpected where key or array/object closer has to be. */
+#define JSON_ERR_EXPECTEDCOLON          (-11)   /* Something unexpected where colon has to be. */
+#define JSON_ERR_EXPECTEDCOMMAORCLOSER  (-12)   /* Something unexpected where comma or array/object has to be. */
+#define JSON_ERR_EXPECTEDEOF            (-13)   /* Something unexpected where end-of-file has to be. */
 #define JSON_ERR_MAXTOTALLEN            (-14)   /* Reached JSON_CONFIG::max_total_len */
 #define JSON_ERR_MAXTOTALVALUES         (-15)   /* Reached JSON_CONFIG::max_total_values */
 #define JSON_ERR_MAXNESTINGLEVEL        (-16)   /* Reached JSON_CONFIG::max_nesting_level */
