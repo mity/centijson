@@ -29,6 +29,15 @@
 #include <float.h>      /* DBL_MIN, DBL_MAX */
 
 
+#ifdef _MSC_VER
+    /* MSVC does not understand "inline" when building as pure C (not C++).
+     * However it understands "__inline" */
+    #ifndef __cplusplus
+        #define inline __inline
+    #endif
+#endif
+
+
 static const JSON_CONFIG json_defaults = {
     10 * 1024 * 1024,       /* max_total_len */
     0,                      /* max_total_values */

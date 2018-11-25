@@ -94,8 +94,8 @@ deep_dict_cmp(const VALUE* v1, const VALUE* v2)
         deep_value_cmp(value1, value2);
     }
 
-    free(keys1);
-    free(keys2);
+    free((void*) keys1);
+    free((void*) keys2);
 }
 
 static int
@@ -791,7 +791,7 @@ test_err_syntax(void)
     TEST_CHECK(pos.line_number == 1);
     TEST_CHECK(pos.column_number == 6);
 
-    err = parse("\"foo\e\"", NULL, 0, NULL, &pos);
+    err = parse("\"foo\b\"", NULL, 0, NULL, &pos);
     TEST_CHECK(err == JSON_ERR_UNESCAPEDCONTROL);
     TEST_CHECK(pos.offset == 4);
     TEST_CHECK(pos.line_number == 1);
