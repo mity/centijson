@@ -834,6 +834,155 @@ test_err_syntax(void)
     TEST_CHECK(pos.column_number == 2);
 }
 
+static void
+test_json_checker(void)
+{
+    /* These tests are from http://www.json.org/JSON_checker/ */
+
+    static const char pass1[] =
+        "[\n"
+        "    \"JSON Test Pattern pass1\",\n"
+        "    {\"object with 1 member\":[\"array with 1 element\"]},\n"
+        "    {},\n"
+        "    [],\n"
+        "    -42,\n"
+        "    true,\n"
+        "    false,\n"
+        "    null,\n"
+        "    {\n"
+        "        \"integer\": 1234567890,\n"
+        "        \"real\": -9876.543210,\n"
+        "        \"e\": 0.123456789e-12,\n"
+        "        \"E\": 1.234567890E+34,\n"
+        "        \"\":  23456789012E66,\n"
+        "        \"zero\": 0,\n"
+        "        \"one\": 1,\n"
+        "        \"space\": \" \",\n"
+        "        \"quote\": \"\\\"\",\n"
+        "        \"backslash\": \"\\\\\",\n"
+        "        \"controls\": \"\\b\\f\\n\\r\\t\",\n"
+        "        \"slash\": \"/ & \\/\",\n"
+        "        \"alpha\": \"abcdefghijklmnopqrstuvwyz\",\n"
+        "        \"ALPHA\": \"ABCDEFGHIJKLMNOPQRSTUVWYZ\",\n"
+        "        \"digit\": \"0123456789\",\n"
+        "        \"0123456789\": \"digit\",\n"
+        "        \"special\": \"`1~!@#$%^&*()_+-={':[,]}|;.</>?\",\n"
+        "        \"hex\": \"\\u0123\\u4567\\u89AB\\uCDEF\\uabcd\\uef4A\",\n"
+        "        \"true\": true,\n"
+        "        \"false\": false,\n"
+        "        \"null\": null,\n"
+        "        \"array\":[  ],\n"
+        "        \"object\":{  },\n"
+        "        \"address\": \"50 St. James Street\",\n"
+        "        \"url\": \"http://www.JSON.org/\",\n"
+        "        \"comment\": \"// /* <!-- --\",\n"
+        "        \"# -- --> */\": \" \",\n"
+        "        \" s p a c e d \" :[1,2 , 3\n"
+        "\n"
+        ",\n"
+        "\n"
+        "4 , 5        ,          6           ,7        ],\"compact\":[1,2,3,4,5,6,7],\n"
+        "        \"jsontext\": \"{\\\"object with 1 member\\\":[\\\"array with 1 element\\\"]}\",\n"
+        "        \"quotes\": \"&#34; \\u0022 %22 0x22 034 &#x22;\",\n"
+        "        \"\\/\\\\\\\"\\uCAFE\\uBABE\\uAB98\\uFCDE\\ubcda\\uef4A\\b\\f\\n\\r\\t`1~!@#$%^&*()_+-=[]{}|;:',./<>?\"\n"
+        ": \"A key can be any string\"\n"
+        "    },\n"
+        "    0.5 ,98.6\n"
+        ",\n"
+        "99.44\n"
+        ",\n"
+        "\n"
+        "1066,\n"
+        "1e1,\n"
+        "0.1e1,\n"
+        "1e-1,\n"
+        "1e00,2e+00,2e-00\n"
+        ",\"rosebud\"]";
+
+    static const char pass3[] = {
+        "{\n"
+        "    \"JSON Test Pattern pass3\": {\n"
+        "        \"The outermost value\": \"must be an object or array.\",\n"
+        "        \"In this test\": \"It is an object.\"\n"
+        "    }\n"
+        "}\n"
+    };
+
+    static const char* fail[] = {
+#if 0
+        /* Disabled, because this case is not really true.
+         *
+         * From RFC-8259 (https://tools.ietf.org/html/rfc8259#page-14):
+         *
+         * > A JSON text is a serialized value.  Note that certain previous
+         * > specifications of JSON constrained a JSON text to be an object or
+         * > an array.  Implementations that generate only objects or arrays
+         * > where a JSON text is called for will be interoperable in the sense
+         * > that all implementations will accept these as conforming JSON
+         * > texts.
+         *
+         * In Centijson, we allow by default any root, but caller may configure
+         * this via flags of json_init().
+         *
+         * We also test that quite throughly in test_err_bad_root_type().
+         */
+        /* fail1.json: */   "\"A JSON payload should be an object or array, not a string.\"",
+#endif
+        /* fail2.json: */   "[\"Unclosed array\"",
+        /* fail3.json: */   "{unquoted_key: \"keys must be quoted\"}",
+        /* fail4.json: */   "[\"extra comma\",]",
+        /* fail5.json: */   "[\"double extra comma\",,]",
+        /* fail6.json: */   "[   , \"<-- missing value\"]",
+        /* fail7.json: */   "[\"Comma after the close\"],",
+        /* fail8.json: */   "[\"Extra close\"]]",
+        /* fail9.json: */   "{\"Extra comma\": true,}",
+        /* fail10.json: */  "{\"Extra value after close\": true} \"misplaced quoted value\"",
+        /* fail11.json: */  "{\"Illegal expression\": 1 + 2}",
+        /* fail12.json: */  "{\"Illegal invocation\": alert()}",
+        /* fail13.json: */  "{\"Numbers cannot have leading zeroes\": 013}",
+        /* fail14.json: */  "{\"Numbers cannot be hex\": 0x14}",
+        /* fail15.json: */  "[\"Illegal backslash escape: \x15\"]",
+        /* fail16.json: */  "[\\naked]",
+        /* fail17.json: */  "[\"Illegal backslash escape: \\017\"]",
+#if 0
+        Wrong. No JSON standard limits maximal nesting. And we allow caller to
+        limit it as he wishes.
+        /* fail18.json: */  "[[[[[[[[[[[[[[[[[[[[\"Too deep\"]]]]]]]]]]]]]]]]]]]]",
+#endif
+        /* fail19.json: */  "{\"Missing colon\" null}",
+        /* fail20.json: */  "{\"Double colon\":: null}",
+        /* fail21.json: */  "{\"Comma instead of colon\", null}",
+        /* fail22.json: */  "[\"Colon instead of comma\": false]",
+        /* fail23.json: */  "[\"Bad value\", truth]",
+        /* fail24.json: */  "['single quote']",
+        /* fail25.json: */  "[\"\ttab character\tin\tstring\t\"]",
+        /* fail26.json: */  "[\"tab\\\tcharacter\\\tin\\\tstring\\\t\"]",
+        /* fail27.json: */  "[\"line\nbreak\"]",
+        /* fail28.json: */  "[\"line\\\nbreak\"]",
+        /* fail29.json: */  "[0e]",
+        /* fail30.json: */  "[0e+]",
+        /* fail31.json: */  "[0e+-1]",
+        /* fail32.json: */  "{\"Comma instead if closing brace\": true,",
+        /* fail33.json: */  "[\"mismatch\"}",
+        NULL
+    };
+
+    static const char* pass[] = {
+        /* pass3.json: */   pass1,
+        /* pass2.json: */   "[[[[[[[[[[[[[[[[[[[\"Not too deep\"]]]]]]]]]]]]]]]]]]]",
+        /* pass3.json: */   pass3,
+        NULL
+    };
+
+    int i;
+
+    for(i = 0; fail[i] != NULL; i++)
+        TEST_CHECK(parse(fail[i], NULL, 0, NULL, NULL) != 0);
+
+    for(i = 0; pass[i] != NULL; i++)
+        TEST_CHECK(parse(pass[i], NULL, 0, NULL, NULL) == 0);
+}
+
 
 TEST_LIST = {
     { "pos-tracking",               test_pos_tracking },
@@ -854,5 +1003,6 @@ TEST_LIST = {
     { "err-bad-closer",             test_err_bad_closer },
     { "err-bad-root-type",          test_err_bad_root_type },
     { "err-syntax",                 test_err_syntax },
+    { "json-checker",               test_json_checker },
     { 0 }
 };
