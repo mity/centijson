@@ -22,46 +22,6 @@ From http://json.org:
 > data-interchange language.
 
 
-## Why Yet Another JSON Parser?
-
-Indeed, there are already hundreds (if not thousands) JSON parsers written in
-C out there. But as far as I know, they mostly fall into one of two categories.
-
-In the 1st category, they are very small and simple (and quite often they also
-take pride in it). But then they usually have one or more shortcomings from
-this list:
-
-* They usually expect full in-memory document to parse and do not allow parsing
-  block by block;
-
-* They usually allow no or very minimal configuration;
-
-* They in almost all cases use an array or linked list for storing the children
-  of JSON arrays as well as of JSON objects (and sometimes even for **all** the
-  data in the JSON document), so searching the object by the key is operation
-  of linear complexity.
-
-  That may be good enough if you really **know** that all the input will be
-  always small. But allow any black hat feed it with some bigger beast and you
-  have Denial of Service faster then you spell it.
-
-* Those really small ones usually often lack possibility of modifying the tree
-  of the data, like adding new items into arrays or dictionaries, or removing
-  them from there.
-
-* They often perform minimal or no UTF-8 encoding validation, do not perform
-  full escape sequence resolution, or fall into troubles if any string contains
-  U+0000 (`"foo\u0000bar"`).
-
-In the 2nd category, there are far less numerous, but very huge beasts which
-provide many scores of functions, which provide very complicated data
-abstraction layers and baroque interfaces, and they are simply too big and
-complicated for my taste or needs or will to incorporate them in my projects.
-
-CentiJSON aims to reside somewhere in the no man's land, between the two
-categories.
-
-
 ## Main features:
 
 * **Size:** The code and memory footprint is quite small.
@@ -127,6 +87,46 @@ categories.
   * Objects (or dictionaries, in terms of `value.h`) are implemented internally
     as red-black trees and have `O(log N)` complexity for all the operations
     like accessing, adding or removing their items.
+
+
+## Why Yet Another JSON Parser?
+
+Indeed, there are already hundreds (if not thousands) JSON parsers written in
+C out there. But as far as I know, they mostly fall into one of two categories.
+
+In the 1st category, they are very small and simple (and quite often they also
+take pride in it). But then they usually have one or more shortcomings from
+this list:
+
+* They usually expect full in-memory document to parse and do not allow parsing
+  block by block;
+
+* They usually allow no or very minimal configuration;
+
+* They in almost all cases use an array or linked list for storing the children
+  of JSON arrays as well as of JSON objects (and sometimes even for **all** the
+  data in the JSON document), so searching the object by the key is operation
+  of linear complexity.
+
+  That may be good enough if you really **know** that all the input will be
+  always small. But allow any black hat feed it with some bigger beast and you
+  have Denial of Service faster then you spell it.
+
+* Those really small ones usually often lack possibility of modifying the tree
+  of the data, like adding new items into arrays or dictionaries, or removing
+  them from there.
+
+* They often perform minimal or no UTF-8 encoding validation, do not perform
+  full escape sequence resolution, or fall into troubles if any string contains
+  U+0000 (`"foo\u0000bar"`).
+
+In the 2nd category, there are far less numerous, but very huge beasts which
+provide many scores of functions, which provide very complicated data
+abstraction layers and baroque interfaces, and they are simply too big and
+complicated for my taste or needs or will to incorporate them in my projects.
+
+CentiJSON aims to reside somewhere in the no man's land, between the two
+categories.
 
 
 ## FAQ
