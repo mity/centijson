@@ -158,6 +158,9 @@ json_switch_automaton(JSON_PARSER* parser, unsigned automaton)
 static inline void
 json_process(JSON_PARSER* parser, JSON_TYPE type, const char* data, size_t size)
 {
+    if(parser->errcode != 0)
+        return;
+
     if(type != JSON_ARRAY_END  &&  type != JSON_OBJECT_END) {
         if(parser->value_counter == 0) {
             switch(type) {
@@ -352,7 +355,7 @@ json_number_automaton(JSON_PARSER* parser, const char* input, size_t size)
             return off;
         } else {
             json_raise_for_value(parser, JSON_ERR_SYNTAX);
-            break;
+            return 0;
         }
 
         off++;
@@ -364,7 +367,7 @@ json_number_automaton(JSON_PARSER* parser, const char* input, size_t size)
         json_raise_for_value(parser, JSON_ERR_MAXNUMBERLEN);
 
     if(input == NULL) {       /* EOF */
-        if(parser->substate & can_see_end) {
+        if(parser->errcode == 0  &&  parser->substate & can_see_end) {
             if(json_buf_append(parser, input, off) != 0)
                 return 0;
             json_process(parser, JSON_NUMBER, parser->buf, parser->buf_used);
@@ -372,8 +375,10 @@ json_number_automaton(JSON_PARSER* parser, const char* input, size_t size)
             json_raise_for_value(parser, JSON_ERR_SYNTAX);
         }
     } else {
-        if(json_buf_append(parser, input, off) != 0)
-            return 0;
+        if(parser->errcode == 0) {
+            if(json_buf_append(parser, input, off) != 0)
+                return 0;
+        }
     }
 
     return off;
