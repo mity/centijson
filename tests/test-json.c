@@ -984,6 +984,82 @@ test_json_checker(void)
 }
 
 
+static char dump_buffer[16 * 256];
+
+static int
+test_dump_callback(const char* data, size_t size, void* userdata)
+{
+    size_t* n = (size_t*) userdata;
+
+    if(!TEST_CHECK(*n + size <= sizeof(dump_buffer)))
+        return -1;
+
+    memcpy(dump_buffer + *n, data, size);
+    *n += size;
+    return 0;
+}
+
+static void
+test_dump(void)
+{
+    static const char expected[] = {
+        "[\n"
+        "\t{\n"
+        "\t\t\"name\": \"Alice\",\n"
+        "\t\t\"age\": 23,\n"
+        "\t\t\"height\": 168.5\n"
+        "\t},\n"
+        "\t{\n"
+        "\t\t\"name\": \"Bob\",\n"
+        "\t\t\"age\": 54,\n"
+        "\t\t\"height\": 182.0\n"
+        "\t}\n"
+        "]"
+    };
+
+    size_t n = 0;
+    VALUE root;
+    VALUE* alice;
+    VALUE* bob;
+    VALUE* name;
+    VALUE* age;
+    VALUE* height;
+    int err;
+
+    value_init_array(&root);
+
+    alice = value_array_append(&root);
+    value_init_dict(alice, VALUE_DICT_MAINTAINORDER);
+    name = value_dict_add(alice, "name");
+    value_init_string(name, "Alice");
+    age = value_dict_add(alice, "age");
+    value_init_uint32(age, 23);
+    height = value_dict_add(alice, "height");
+    value_init_float(height, 168.5);
+
+    bob = value_array_append(&root);
+    value_init_dict(bob, VALUE_DICT_MAINTAINORDER);
+    name = value_dict_add(bob, "name");
+    value_init_string(name, "Bob");
+    age = value_dict_add(bob, "age");
+    value_init_uint32(age, 54);
+    height = value_dict_add(bob, "height");
+    value_init_float(height, 182.0);
+
+    err = json_dom_dump(&root, test_dump_callback, (void*) &n, 0, JSON_DOM_DUMP_PREFERDICTORDER);
+    if(TEST_CHECK(err == 0)) {
+        /* Parse it back and compare it with what we expect. */
+        VALUE a, b;
+        TEST_CHECK(json_dom_parse(dump_buffer, n, NULL, JSON_DOM_MAINTAINDICTORDER, &a, NULL) == 0);
+        TEST_CHECK(json_dom_parse(expected, strlen(expected), NULL, JSON_DOM_MAINTAINDICTORDER, &b, NULL) == 0);
+        deep_value_cmp(&a, &b);
+    }
+
+    value_fini(&root);
+}
+
+
+
 TEST_LIST = {
     { "pos-tracking",               test_pos_tracking },
     { "null",                       test_null },
@@ -1004,5 +1080,6 @@ TEST_LIST = {
     { "err-bad-root-type",          test_err_bad_root_type },
     { "err-syntax",                 test_err_syntax },
     { "json-checker",               test_json_checker },
+    { "dump",                       test_dump },
     { 0 }
 };
