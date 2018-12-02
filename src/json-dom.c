@@ -119,7 +119,7 @@ json_dom_process(JSON_TYPE type, const char* data, size_t data_size, void* user_
         case JSON_NUMBER:       init_val_ret = init_number(new_value, data, data_size); break;
         case JSON_STRING:       init_val_ret = value_init_string_(new_value, data, data_size); break;
         case JSON_ARRAY_BEG:    init_val_ret = value_init_array(new_value); break;
-        case JSON_OBJECT_BEG:   init_val_ret = value_init_dict(new_value, dom_parser->dict_flags); break;
+        case JSON_OBJECT_BEG:   init_val_ret = value_init_dict_ex(new_value, NULL, dom_parser->dict_flags); break;
         default:                return JSON_ERR_INTERNAL;
     }
 

@@ -1029,7 +1029,7 @@ test_dump(void)
     value_init_array(&root);
 
     alice = value_array_append(&root);
-    value_init_dict(alice, VALUE_DICT_MAINTAINORDER);
+    value_init_dict_ex(alice, NULL, VALUE_DICT_MAINTAINORDER);
     name = value_dict_add(alice, "name");
     value_init_string(name, "Alice");
     age = value_dict_add(alice, "age");
@@ -1038,7 +1038,7 @@ test_dump(void)
     value_init_float(height, 168.5);
 
     bob = value_array_append(&root);
-    value_init_dict(bob, VALUE_DICT_MAINTAINORDER);
+    value_init_dict_ex(bob, NULL, VALUE_DICT_MAINTAINORDER);
     name = value_dict_add(bob, "name");
     value_init_string(name, "Bob");
     age = value_dict_add(bob, "age");

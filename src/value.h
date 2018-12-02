@@ -263,14 +263,23 @@ void value_array_clean(VALUE* v);
  */
 
 
-/* Flag for init_dict() asking to maintain the order in which the dictionary
+/* Flag for init_dict_ex() asking to maintain the order in which the dictionary
  * is populated and enables dict_walk_ordered().
  *
  * If used, the dictionary consumes more memory for every node.
  */
 #define VALUE_DICT_MAINTAINORDER      0x0001
 
-int value_init_dict(VALUE* v, unsigned flags);
+/* Initialize the value as a (empty) dictionary.
+ *
+ * value_init_dict_ex() allows to specify custom comparer function (may be NULL)
+ * or flags.
+ */
+int value_init_dict(VALUE* v);
+int value_init_dict_ex(VALUE* v,
+                       int (*custom_cmp_func)(const char* /*key1*/, size_t /*len1*/,
+                                              const char* /*key2*/, size_t /*len2*/),
+                       unsigned flags);
 
 /* Get flags of the dictionary.
  */

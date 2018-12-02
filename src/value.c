@@ -30,9 +30,10 @@
 
 
 #define TYPE_MASK       0x0f
-#define IS_NEW          0x40    /* only for VALUE_NULL */
-#define HAS_REDCOLOR    0x40    /* only for VALUE_STRING (when used as RBTREE::key) */
-#define HAS_ORDERLIST   0x40    /* only for VALUE_DICT */
+#define IS_NEW          0x10    /* only for VALUE_NULL */
+#define HAS_REDCOLOR    0x10    /* only for VALUE_STRING (when used as RBTREE::key) */
+#define HAS_ORDERLIST   0x10    /* only for VALUE_DICT */
+#define HAS_CUSTOMCMP   0x20    /* only for VALUE_DICT */
 #define IS_MALLOCED     0x80
 
 
@@ -67,9 +68,11 @@ struct DICT_tag {
     RBTREE* root;
     size_t size;
 
-    /* These are present only if HAS_ORDERLIST. */
+    /* These are present only when flags VALUE_DICT_MAINTAINORDER or
+     * custom_cmp_func is used. */
     RBTREE* order_head;
     RBTREE* order_tail;
+    int (*cmp_func)(const char*, size_t, const char*, size_t);
 };
 
 
@@ -408,7 +411,15 @@ value_init_array(VALUE* v)
 }
 
 int
-value_init_dict(VALUE* v, unsigned flags)
+value_init_dict(VALUE* v)
+{
+    return value_init_dict_ex(v, NULL, 0);
+}
+
+int
+value_init_dict_ex(VALUE* v,
+                   int (*custom_cmp_func)(const char*, size_t, const char*, size_t),
+                   unsigned flags)
 {
     uint8_t* payload;
     size_t payload_size;
@@ -416,7 +427,7 @@ value_init_dict(VALUE* v, unsigned flags)
     if(v == NULL)
         return -1;
 
-    if(flags & VALUE_DICT_MAINTAINORDER)
+    if(custom_cmp_func != NULL  ||  (flags & VALUE_DICT_MAINTAINORDER))
         payload_size = sizeof(DICT);
     else
         payload_size = OFFSETOF(DICT, order_head);
@@ -425,6 +436,11 @@ value_init_dict(VALUE* v, unsigned flags)
     if(payload == NULL)
         return -1;
     memset(payload, 0, payload_size);
+
+    if(custom_cmp_func != NULL) {
+        v->data[0] |= HAS_CUSTOMCMP;
+        ((DICT*)payload)->cmp_func = custom_cmp_func;
+    }
 
     if(flags & VALUE_DICT_MAINTAINORDER)
         v->data[0] |= HAS_ORDERLIST;
@@ -803,7 +819,7 @@ value_dict_payload(VALUE* v)
 }
 
 static int
-value_dict_cmp(const char* key1, size_t len1, const char* key2, size_t len2)
+value_dict_default_cmp(const char* key1, size_t len1, const char* key2, size_t len2)
 {
     /* Comparing lengths 1st might be in general especially if the keys are
      * long, but it would break value_dict_walk_sorted().
@@ -822,6 +838,16 @@ value_dict_cmp(const char* key1, size_t len1, const char* key2, size_t len2)
         cmp = (len1 < len2) ? -1 : +1;
 
     return cmp;
+}
+
+static int
+value_dict_cmp(const VALUE* v, const DICT* d,
+               const char* key1, size_t len1, const char* key2, size_t len2)
+{
+    if(!(v->data[0] & HAS_CUSTOMCMP))
+        return value_dict_default_cmp(key1, len1, key2, len2);
+    else
+        return d->cmp_func(key1, len1, key2, len2);
 }
 
 static int
@@ -910,7 +936,7 @@ value_dict_get_(const VALUE* v, const char* key, size_t key_len)
     int cmp;
 
     while(node != NULL) {
-        cmp = value_dict_cmp(key, key_len, value_string(&node->key), value_string_length(&node->key));
+        cmp = value_dict_cmp(v, d, key, key_len, value_string(&node->key), value_string_length(&node->key));
 
         if(cmp < 0)
             node = node->left;
@@ -1059,7 +1085,7 @@ value_dict_get_or_add_(VALUE* v, const char* key, size_t key_len)
         return NULL;
 
     while(node != NULL) {
-        cmp = value_dict_cmp(key, key_len,
+        cmp = value_dict_cmp(v, d, key, key_len,
                 value_string(&node->key), value_string_length(&node->key));
 
         path[path_len++] = node;
@@ -1218,7 +1244,7 @@ value_dict_remove_(VALUE* v, const char* key, size_t key_len)
 
     /* Find the node to remove. */
     while(node != NULL) {
-        cmp = value_dict_cmp(key, key_len,
+        cmp = value_dict_cmp(v, d, key, key_len,
                 value_string(&node->key), value_string_length(&node->key));
 
         path[path_len++] = node;
@@ -1411,7 +1437,7 @@ value_dict_clean(VALUE* v)
     }
 
     if(v->data[0] & HAS_ORDERLIST)
-        memset(d, 0, sizeof(DICT));
+        memset(d, 0, OFFSETOF(DICT, cmp_func));
     else
         memset(d, 0, OFFSETOF(DICT, order_head));
 }
