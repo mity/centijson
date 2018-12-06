@@ -1270,6 +1270,8 @@ test_dump(void)
         TEST_CHECK(json_dom_parse(dump_buffer, n, NULL, JSON_DOM_MAINTAINDICTORDER, &a, NULL) == 0);
         TEST_CHECK(json_dom_parse(expected, strlen(expected), NULL, JSON_DOM_MAINTAINDICTORDER, &b, NULL) == 0);
         deep_value_cmp(&a, &b);
+        value_fini(&a);
+        value_fini(&b);
     }
 
     value_fini(&root);
