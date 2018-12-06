@@ -894,6 +894,7 @@ json_fini(JSON_PARSER* parser, JSON_INPUT_POS* p_pos)
         memcpy(p_pos, &parser->pos, sizeof(JSON_INPUT_POS));
 
     free(parser->nesting_stack);
+    free(parser->buf);
     return parser->errcode;
 }
 
