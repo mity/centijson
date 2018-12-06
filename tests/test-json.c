@@ -482,21 +482,22 @@ static void
 test_string_c_escape(void)
 {
     static const struct {
+        const char* name;
         const char* input;
         const char* output;
     } vector[] = {
-        { "\"\\\"\"", "\"" },
-        { "\"\\\\\"", "\\" },
-        { "\"\\/\"", "/" },
-        { "\"\\b\"", "\b" },
-        { "\"\\f\"", "\f" },
-        { "\"\\n\"", "\n" },
-        { "\"\\r\"", "\r" },
-        { "\"\\t\"", "\t" },
-        { "\"\\u0001\"", "\x01" },
-        { "\"\\X\"", NULL },
-        { "\"\\uABC\"", NULL },
-        { "\"\\uAxBC\"", NULL },
+        { "quotation mark", "\"\\\"\"", "\"" },
+        { "reverse solidus", "\"\\\\\"", "\\" },
+        { "solidus", "\"\\/\"", "/" },
+        { "backspace", "\"\\b\"", "\b" },
+        { "formfeed", "\"\\f\"", "\f" },
+        { "newline", "\"\\n\"", "\n" },
+        { "carriage return", "\"\\r\"", "\r" },
+        { "horizontal tab", "\"\\t\"", "\t" },
+        { "unicode", "\"\\u0001\"", "\x01" },
+        { "unknown escape", "\"\\X\"", NULL },
+        { "broken unicode 1", "\"\\uABC\"", NULL },
+        { "broken unicode 2", "\"\\uAxBC\"", NULL },
         { 0 }
     };
 
@@ -505,6 +506,7 @@ test_string_c_escape(void)
     VALUE root;
 
     for(i = 0; vector[i].input != NULL; i++) {
+        TEST_CASE(vector[i].name);
         err = parse(vector[i].input, NULL, 0, &root, NULL);
         if(vector[i].output != NULL) {
             TEST_CHECK(err == JSON_ERR_SUCCESS);
@@ -520,71 +522,73 @@ static void
 test_string_utf8(void)
 {
     static const struct {
+        const char* name;
         const char* input;
         const char* output;     /* NULL for ill-formed input. */
         const char* output_ignore_ill_formed;
         const char* output_fix_ill_formed;
     } vector[] = {
         /* Trivial text. */
-        { "\"foo\"", "foo", "foo", "foo" },
+        { "trivial", "\"foo\"", "foo", "foo", "foo" },
 
         /* Correct UTF-8 text */
-        { "\"\xce\xba\xe1\xbd\xb9\xcf\x83\xce\xbc\xce\xb5\"",   /* Greek word 'kosme' */
+        { "kosme",
+          "\"\xce\xba\xe1\xbd\xb9\xcf\x83\xce\xbc\xce\xb5\"",   /* Greek word 'kosme' */
           "\xce\xba\xe1\xbd\xb9\xcf\x83\xce\xbc\xce\xb5",
           "\xce\xba\xe1\xbd\xb9\xcf\x83\xce\xbc\xce\xb5",
           "\xce\xba\xe1\xbd\xb9\xcf\x83\xce\xbc\xce\xb5" },
 
         /* The smallest possible UTF-8 sequences of given length
          * (except for 1 byte where we cannot use control characters) */
-        { "\"\x20\"", "\x20", "\x20", "\x20" },
-        { "\"\xc2\x80\"", "\xc2\x80", "\xc2\x80", "\xc2\x80" },
-        { "\"\xe0\xa0\x80\"", "\xe0\xa0\x80", "\xe0\xa0\x80", "\xe0\xa0\x80" },
-        { "\"\xf0\x90\x80\x80\"", "\xf0\x90\x80\x80", "\xf0\x90\x80\x80", "\xf0\x90\x80\x80" },
+        { "smallest 1", "\"\x20\"", "\x20", "\x20", "\x20" },
+        { "smallest 2", "\"\xc2\x80\"", "\xc2\x80", "\xc2\x80", "\xc2\x80" },
+        { "smallest 3","\"\xe0\xa0\x80\"", "\xe0\xa0\x80", "\xe0\xa0\x80", "\xe0\xa0\x80" },
+        { "smallest 4","\"\xf0\x90\x80\x80\"", "\xf0\x90\x80\x80", "\xf0\x90\x80\x80", "\xf0\x90\x80\x80" },
 
         /* The largest possible UTF-8 sequences of given length */
-        { "\"\x7f\"", "\x7f", "\x7f", "\x7f" },
-        { "\"\xdf\xbf\"", "\xdf\xbf", "\xdf\xbf", "\xdf\xbf" },
-        { "\"\xef\xbf\xbf\"", "\xef\xbf\xbf", "\xef\xbf\xbf", "\xef\xbf\xbf" },
-        { "\"\xf4\x8f\xbf\xbf\"", "\xf4\x8f\xbf\xbf", "\xf4\x8f\xbf\xbf", "\xf4\x8f\xbf\xbf" },
+        { "largest 1", "\"\x7f\"", "\x7f", "\x7f", "\x7f" },
+        { "largest 2", "\"\xdf\xbf\"", "\xdf\xbf", "\xdf\xbf", "\xdf\xbf" },
+        { "largest 3", "\"\xef\xbf\xbf\"", "\xef\xbf\xbf", "\xef\xbf\xbf", "\xef\xbf\xbf" },
+        { "largest 4", "\"\xf4\x8f\xbf\xbf\"", "\xf4\x8f\xbf\xbf", "\xf4\x8f\xbf\xbf", "\xf4\x8f\xbf\xbf" },
 
         /* Other boundary conditions */
-        { "\"\xed\x9f\xbf\"", "\xed\x9f\xbf", "\xed\x9f\xbf", "\xed\x9f\xbf" },
-        { "\"\xee\x80\x80\"", "\xee\x80\x80", "\xee\x80\x80", "\xee\x80\x80" },
-        { "\"\xef\xbf\xbd\"", "\xef\xbf\xbd", "\xef\xbf\xbd", "\xef\xbf\xbd" },
+        { "boundary 1", "\"\xed\x9f\xbf\"", "\xed\x9f\xbf", "\xed\x9f\xbf", "\xed\x9f\xbf" },
+        { "boundary 2", "\"\xee\x80\x80\"", "\xee\x80\x80", "\xee\x80\x80", "\xee\x80\x80" },
+        { "boundary 3", "\"\xef\xbf\xbd\"", "\xef\xbf\xbd", "\xef\xbf\xbd", "\xef\xbf\xbd" },
 
         /* Orphan trailing byte(s) */
-        { "\"\x80\"", NULL, "\x80", "\xef\xbf\xbd" },
-        { "\"\xbf\"", NULL, "\xbf", "\xef\xbf\xbd" },
-        { "\"\x80\x80\"", NULL, "\x80\x80", "\xef\xbf\xbd\xef\xbf\xbd" },
+        { "orphan 1", "\"\x80\"", NULL, "\x80", "\xef\xbf\xbd" },
+        { "orphan 2", "\"\xbf\"", NULL, "\xbf", "\xef\xbf\xbd" },
+        { "orphan 3", "\"\x80\x80\"", NULL, "\x80\x80", "\xef\xbf\xbd\xef\xbf\xbd" },
 
         /* Incomplete UTF-8 sequences */
-        { "\"\xc2\"", NULL, "\xc2", "\xef\xbf\xbd" },
-        { "\"\xe0\"", NULL, "\xe0", "\xef\xbf\xbd" },
-        { "\"\xe0\xa0\"", NULL, "\xe0\xa0", "\xef\xbf\xbd" },
-        { "\"\xf0\"", NULL, "\xf0", "\xef\xbf\xbd" },
-        { "\"\xf0\x90\"", NULL, "\xf0\x90", "\xef\xbf\xbd" },
-        { "\"\xf0\x90\x80\"", NULL, "\xf0\x90\x80", "\xef\xbf\xbd" },
+        { "incomplete 1.1", "\"\xc2\"", NULL, "\xc2", "\xef\xbf\xbd" },
+        { "incomplete 1.2", "\"\xe0\"", NULL, "\xe0", "\xef\xbf\xbd" },
+        { "incomplete 1.3", "\"\xe0\xa0\"", NULL, "\xe0\xa0", "\xef\xbf\xbd" },
+        { "incomplete 1.4", "\"\xf0\"", NULL, "\xf0", "\xef\xbf\xbd" },
+        { "incomplete 1.5", "\"\xf0\x90\"", NULL, "\xf0\x90", "\xef\xbf\xbd" },
+        { "incomplete 1.6", "\"\xf0\x90\x80\"", NULL, "\xf0\x90\x80", "\xef\xbf\xbd" },
 
         /* Incomplete UTF-8 sequences in the middle of text */
-        { "\"foo\xc2""bar\"", NULL, "foo\xc2""bar", "foo\xef\xbf\xbd""bar" },
-        { "\"foo\xe0""bar\"", NULL, "foo\xe0""bar", "foo\xef\xbf\xbd""bar" },
-        { "\"foo\xe0\xa0""bar\"", NULL, "foo\xe0\xa0""bar", "foo\xef\xbf\xbd""bar" },
-        { "\"foo\xf0""bar\"", NULL, "foo\xf0""bar", "foo\xef\xbf\xbd""bar" },
-        { "\"foo\xf0\x90""bar\"", NULL, "foo\xf0\x90""bar", "foo\xef\xbf\xbd""bar" },
-        { "\"foo\xf0\x90\x80""bar\"", NULL, "foo\xf0\x90\x80""bar", "foo\xef\xbf\xbd""bar" },
+        { "incomplete 2.1", "\"foo\xc2""bar\"", NULL, "foo\xc2""bar", "foo\xef\xbf\xbd""bar" },
+        { "incomplete 2.2", "\"foo\xe0""bar\"", NULL, "foo\xe0""bar", "foo\xef\xbf\xbd""bar" },
+        { "incomplete 2.3", "\"foo\xe0\xa0""bar\"", NULL, "foo\xe0\xa0""bar", "foo\xef\xbf\xbd""bar" },
+        { "incomplete 2.4", "\"foo\xf0""bar\"", NULL, "foo\xf0""bar", "foo\xef\xbf\xbd""bar" },
+        { "incomplete 2.5", "\"foo\xf0\x90""bar\"", NULL, "foo\xf0\x90""bar", "foo\xef\xbf\xbd""bar" },
+        { "incomplete 2.6", "\"foo\xf0\x90\x80""bar\"", NULL, "foo\xf0\x90\x80""bar", "foo\xef\xbf\xbd""bar" },
 
         /* 3 concatenated incomplete UTF-8 sequences */
-        { "\"\xc2\xf0\x90\x80\xe0\"", NULL, "\xc2\xf0\x90\x80\xe0", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
+        { "incomplete 3.1", "\"\xc2\xf0\x90\x80\xe0\"", NULL, "\xc2\xf0\x90\x80\xe0", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
 
         /* Over-long UTF-8 sequences. */
-        { "\"\xc0\xaf\"", NULL, "\xc0\xaf", "\xef\xbf\xbd\xef\xbf\xbd" },
-        { "\"\xc0\x80\xaf\"", NULL, "\xc0\x80\xaf", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
+        { "overlong 1", "\"\xc0\xaf\"", NULL, "\xc0\xaf", "\xef\xbf\xbd\xef\xbf\xbd" },
+        { "overlong 2", "\"\xc0\x80\xaf\"", NULL, "\xc0\x80\xaf", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
 
         /* Codepoints reserved for UTF-16 surrogates. */
-        { "\"\xed\xa0\x80\"", NULL, "\xed\xa0\x80", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },   /* U+d800 */
-        { "\"\xed\xaf\xbf\"", NULL, "\xed\xaf\xbf", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },   /* U+dbff */
-        { "\"\xed\xb0\x80\"", NULL, "\xed\xb0\x80", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },   /* U+dc00 */
-        { "\"\xed\xbf\xbf\"", NULL, "\xed\xbf\xbf", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },   /* U+dfff */
+        { "high surrogate 1", "\"\xed\xa0\x80\"", NULL, "\xed\xa0\x80", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },   /* U+d800 */
+        { "high surrogate 2", "\"\xed\xaf\xbf\"", NULL, "\xed\xaf\xbf", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },   /* U+dbff */
+        { "low surrogate 1", "\"\xed\xb0\x80\"", NULL, "\xed\xb0\x80", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },    /* U+dc00 */
+        { "low surrogate 2", "\"\xed\xbf\xbf\"", NULL, "\xed\xbf\xbf", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },    /* U+dfff */
 
         { 0 }
     };
@@ -603,6 +607,8 @@ test_string_utf8(void)
     cfg_fix_ill_formed.flags |= JSON_FIXILLUTF8VALUE;
 
     for(i = 0; vector[i].input != NULL; i++) {
+        TEST_CASE(vector[i].name);
+
         err = parse(vector[i].input, &cfg_default, 0, &root, NULL);
         if(vector[i].output != NULL) {
             TEST_CHECK(err == JSON_ERR_SUCCESS);
@@ -630,28 +636,29 @@ static void
 test_string_unicode_escape(void)
 {
     static const struct {
+        const char* name;
         const char* input;
         const char* output;         /* NULL for ill-formed input. */
         const char* output_ignore_ill_formed;
         const char* output_fix_ill_formed;
     } vector[] = {
         /* Simple Plane 0 (BMP) codepoints. */
-        { "\"\\u0001\"", "\x01", "\x01", "\x01" },
-        { "\"\\uabcd\"", "\xea\xaf\x8d", "\xea\xaf\x8d", "\xea\xaf\x8d" },
-        { "\"\\uABCD\"", "\xea\xaf\x8d", "\xea\xaf\x8d", "\xea\xaf\x8d" },
-        { "\"\\uAbCd\"", "\xea\xaf\x8d", "\xea\xaf\x8d", "\xea\xaf\x8d" },
-        { "\"\\uABCD\\uabcd\"", "\xea\xaf\x8d\xea\xaf\x8d", "\xea\xaf\x8d\xea\xaf\x8d", "\xea\xaf\x8d\xea\xaf\x8d" },
-        { "\"\\uffff\"", "\xef\xbf\xbf", "\xef\xbf\xbf", "\xef\xbf\xbf" },
+        { "U+0001", "\"\\u0001\"", "\x01", "\x01", "\x01" },
+        { "U+abcd", "\"\\uabcd\"", "\xea\xaf\x8d", "\xea\xaf\x8d", "\xea\xaf\x8d" },
+        { "U+ABCD", "\"\\uABCD\"", "\xea\xaf\x8d", "\xea\xaf\x8d", "\xea\xaf\x8d" },
+        { "U+AbCd", "\"\\uAbCd\"", "\xea\xaf\x8d", "\xea\xaf\x8d", "\xea\xaf\x8d" },
+        { "U+ABCD U+abcd", "\"\\uABCD\\uabcd\"", "\xea\xaf\x8d\xea\xaf\x8d", "\xea\xaf\x8d\xea\xaf\x8d", "\xea\xaf\x8d\xea\xaf\x8d" },
+        { "U+ffff", "\"\\uffff\"", "\xef\xbf\xbf", "\xef\xbf\xbf", "\xef\xbf\xbf" },
 
         /* Surrogate pairs. */
-        { "\"\\ud800\\udc00\"", "\xf0\x90\x80\x80", "\xf0\x90\x80\x80", "\xf0\x90\x80\x80" },
-        { "\"\\udbff\\udfff\"", "\xf4\x8f\xbf\xbf", "\xf4\x8f\xbf\xbf", "\xf4\x8f\xbf\xbf" },
+        { "U+d800 U+dc00", "\"\\ud800\\udc00\"", "\xf0\x90\x80\x80", "\xf0\x90\x80\x80", "\xf0\x90\x80\x80" },
+        { "U+dbff U+dfff", "\"\\udbff\\udfff\"", "\xf4\x8f\xbf\xbf", "\xf4\x8f\xbf\xbf", "\xf4\x8f\xbf\xbf" },
 
         /* Orphan surrogates. */
-        { "\"\\ud800\"", NULL, "\xed\xa0\x80", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
-        { "\"\\udbff\"", NULL, "\xed\xaf\xbf", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
-        { "\"\\udc00\"", NULL, "\xed\xb0\x80", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
-        { "\"\\udfff\"", NULL, "\xed\xbf\xbf", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
+        { "U+d800", "\"\\ud800\"", NULL, "\xed\xa0\x80", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
+        { "U+dbff", "\"\\udbff\"", NULL, "\xed\xaf\xbf", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
+        { "U+dc00", "\"\\udc00\"", NULL, "\xed\xb0\x80", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
+        { "U+dfff", "\"\\udfff\"", NULL, "\xed\xbf\xbf", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
 
         { 0 }
     };
@@ -670,6 +677,8 @@ test_string_unicode_escape(void)
     cfg_fix_ill_formed.flags |= JSON_FIXILLUTF8VALUE;
 
     for(i = 0; vector[i].input != NULL; i++) {
+        TEST_CASE(vector[i].name);
+
         err = parse(vector[i].input, &cfg_default, 0, &root, NULL);
         if(vector[i].output != NULL) {
             TEST_CHECK(err == JSON_ERR_SUCCESS);
@@ -1125,7 +1134,10 @@ test_json_checker(void)
         "}\n"
     };
 
-    static const char* fail[] = {
+    static const struct {
+        const char* name;
+        const char* input;
+    } fail[] = {
 #if 0
         /* Disabled, because this case is not really true.
          *
@@ -1143,61 +1155,68 @@ test_json_checker(void)
          *
          * We also test that quite throughly in test_err_bad_root_type().
          */
-        /* fail1.json: */   "\"A JSON payload should be an object or array, not a string.\"",
+        { "fail 1",  "\"A JSON payload should be an object or array, not a string.\"" },
 #endif
-        /* fail2.json: */   "[\"Unclosed array\"",
-        /* fail3.json: */   "{unquoted_key: \"keys must be quoted\"}",
-        /* fail4.json: */   "[\"extra comma\",]",
-        /* fail5.json: */   "[\"double extra comma\",,]",
-        /* fail6.json: */   "[   , \"<-- missing value\"]",
-        /* fail7.json: */   "[\"Comma after the close\"],",
-        /* fail8.json: */   "[\"Extra close\"]]",
-        /* fail9.json: */   "{\"Extra comma\": true,}",
-        /* fail10.json: */  "{\"Extra value after close\": true} \"misplaced quoted value\"",
-        /* fail11.json: */  "{\"Illegal expression\": 1 + 2}",
-        /* fail12.json: */  "{\"Illegal invocation\": alert()}",
-        /* fail13.json: */  "{\"Numbers cannot have leading zeroes\": 013}",
-        /* fail14.json: */  "{\"Numbers cannot be hex\": 0x14}",
-        /* fail15.json: */  "[\"Illegal backslash escape: \x15\"]",
-        /* fail16.json: */  "[\\naked]",
-        /* fail17.json: */  "[\"Illegal backslash escape: \\017\"]",
+        { "fail 2",  "[\"Unclosed array\"" },
+        { "fail 3",  "{unquoted_key: \"keys must be quoted\"}" },
+        { "fail 4",  "[\"extra comma\",]" },
+        { "fail 5",  "[\"double extra comma\",,]" },
+        { "fail 6",  "[   , \"<-- missing value\"]" },
+        { "fail 7",  "[\"Comma after the close\"]," },
+        { "fail 8",  "[\"Extra close\"]]" },
+        { "fail 9",  "{\"Extra comma\": true,}" },
+        { "fail 10", "{\"Extra value after close\": true} \"misplaced quoted value\"" },
+        { "fail 11", "{\"Illegal expression\": 1 + 2}" },
+        { "fail 12", "{\"Illegal invocation\": alert()}" },
+        { "fail 13", "{\"Numbers cannot have leading zeroes\": 013}" },
+        { "fail 14", "{\"Numbers cannot be hex\": 0x14}" },
+        { "fail 15", "[\"Illegal backslash escape: \x15\"]" },
+        { "fail 16", "[\\naked]" },
+        { "fail 17", "[\"Illegal backslash escape: \\017\"]" },
 #if 0
         Wrong. No JSON standard limits maximal nesting. And we allow caller to
         limit it as he wishes.
-        /* fail18.json: */  "[[[[[[[[[[[[[[[[[[[[\"Too deep\"]]]]]]]]]]]]]]]]]]]]",
+        { "fail 18", "[[[[[[[[[[[[[[[[[[[[\"Too deep\"]]]]]]]]]]]]]]]]]]]]" },
 #endif
-        /* fail19.json: */  "{\"Missing colon\" null}",
-        /* fail20.json: */  "{\"Double colon\":: null}",
-        /* fail21.json: */  "{\"Comma instead of colon\", null}",
-        /* fail22.json: */  "[\"Colon instead of comma\": false]",
-        /* fail23.json: */  "[\"Bad value\", truth]",
-        /* fail24.json: */  "['single quote']",
-        /* fail25.json: */  "[\"\ttab character\tin\tstring\t\"]",
-        /* fail26.json: */  "[\"tab\\\tcharacter\\\tin\\\tstring\\\t\"]",
-        /* fail27.json: */  "[\"line\nbreak\"]",
-        /* fail28.json: */  "[\"line\\\nbreak\"]",
-        /* fail29.json: */  "[0e]",
-        /* fail30.json: */  "[0e+]",
-        /* fail31.json: */  "[0e+-1]",
-        /* fail32.json: */  "{\"Comma instead if closing brace\": true,",
-        /* fail33.json: */  "[\"mismatch\"}",
-        NULL
+        { "fail 19", "{\"Missing colon\" null}" },
+        { "fail 20", "{\"Double colon\":: null}" },
+        { "fail 21", "{\"Comma instead of colon\", null}" },
+        { "fail 22", "[\"Colon instead of comma\": false]" },
+        { "fail 23", "[\"Bad value\", truth]" },
+        { "fail 24", "['single quote']" },
+        { "fail 25", "[\"\ttab character\tin\tstring\t\"]" },
+        { "fail 26", "[\"tab\\\tcharacter\\\tin\\\tstring\\\t\"]" },
+        { "fail 27", "[\"line\nbreak\"]" },
+        { "fail 28", "[\"line\\\nbreak\"]" },
+        { "fail 29", "[0e]" },
+        { "fail 30", "[0e+]" },
+        { "fail 31", "[0e+-1]" },
+        { "fail 32", "{\"Comma instead if closing brace\": true," },
+        { "fail 33", "[\"mismatch\"}" },
+        { 0 }
     };
 
-    static const char* pass[] = {
-        /* pass3.json: */   pass1,
-        /* pass2.json: */   "[[[[[[[[[[[[[[[[[[[\"Not too deep\"]]]]]]]]]]]]]]]]]]]",
-        /* pass3.json: */   pass3,
-        NULL
+    static const struct {
+        const char* name;
+        const char* input;
+    } pass[] = {
+        { "pass 1", pass1 },
+        { "pass 2", "[[[[[[[[[[[[[[[[[[[\"Not too deep\"]]]]]]]]]]]]]]]]]]]" },
+        { "pass 3", pass3 },
+        { 0 }
     };
 
     int i;
 
-    for(i = 0; fail[i] != NULL; i++)
-        TEST_CHECK(parse(fail[i], NULL, 0, NULL, NULL) != 0);
+    for(i = 0; fail[i].name != NULL; i++) {
+        TEST_CASE(fail[i].name);
+        TEST_CHECK(parse(fail[i].input, NULL, 0, NULL, NULL) != 0);
+    }
 
-    for(i = 0; pass[i] != NULL; i++)
-        TEST_CHECK(parse(pass[i], NULL, 0, NULL, NULL) == 0);
+    for(i = 0; pass[i].name != NULL; i++) {
+        TEST_CASE(pass[i].name);
+        TEST_CHECK(parse(pass[i].input, NULL, 0, NULL, NULL) == 0);
+    }
 }
 
 
