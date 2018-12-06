@@ -33,8 +33,9 @@ From http://json.org:
     input forms valid JSON.
 
   * **String validation:** CentiJSON verifies that all strings are valid UTF-8
-    (including surrogate pair correctness). All JSON escape sequences are
-    automatically translated to their respective Unicode counterparts.
+    (including corner cases like two Unicode escapes forming surrogate pairs).
+    All JSON escape sequences are automatically translated to their respective
+    Unicode counterparts.
 
   * **Diagnostics:** In the case of invalid input, you get more then just some
     failure flag, but full information about nature of the issue, and also an
@@ -70,7 +71,7 @@ From http://json.org:
     builder on top of the SAX-like parser which populates the data storage.
 
   * **Data storage:** The data storage module, `value.h` + `value.c` from
-    [C-reusables](http://github.com/mity/c-reusables) is very versatile and
+    [C Reusables](http://github.com/mity/c-reusables) is very versatile and
     it is not bound to the JSON parser implementation in any way, so you can
     reuse it for other purposes.
 
@@ -127,6 +128,91 @@ complicated for my taste or needs or will to incorporate them in my projects.
 
 CentiJSON aims to reside somewhere in the no man's land, between the two
 categories.
+
+
+## Using CentiJSON
+
+### SAX-like Parser
+
+(Disclaimer: If you don't know what SAX-like Parser means, you likely want
+to see the section below about the DOM Parser and ignore this section.)
+
+If you want to use just the SAX-like parser, you need, in a nutshell, follow
+these steps.
+
+1. Incorporate `src/json.h` and `src/json.c` into your project.
+
+2. Use `#include "json.h"` in all relevant sources of your projects where
+   you deal with JSON parsing.
+
+3. Implement callback function, which is called anytime a scalar value (`null`,
+   `false`, `true`, number or string) are encountered; or whenever a begin
+   or end of a container (array or object) are encountered.
+
+   To help with the implementation of the callback, you may call some utility
+   functions to e.g. analyze a number found in the JSON input or to convert
+   it to particular C types (see functions like e.g. `json_number_to_int32()`).
+
+4. To parse a JSON input part by part (e.g. if you read the input by some
+   blocks from a file), use `json_init()` + `json_feed()` + `json_fini()`.
+   Or alternatively, if you have whole input in a single buffer, you may use
+   `json_parse()` which wraps the three functions.
+
+Note, that CentiJSON fully verifies correctness the input. But it is done on
+the fly. Hence, if you feed the parser with broken JSON file, your callback
+function can see e.g. a beginning of an array but not its end, if in the mean
+time the parser aborts due to an error.
+
+Hence, if the parsing as a whole fails (`json_fini()` or `json_parse()` returns
+non-zero), you may still likely need to release any resources you allocated so
+far as the callback has been called through out the process; and the code
+dealing with that has to be ready the parsing is aborted at any point between
+the calls of the callback.
+
+See comments in `src/json.h` for more details about the API.
+
+### DOM Parser
+
+To use just the DOM parser, follows these steps:
+
+1. Incorporate all the sources in the `src` directory into your project.
+
+2. Use `#include "json-dom.h"` in all relevant sources of your projects where
+   you deal with JSON parsing, and `#include "value.h"` in all sources where
+   you query the parsed data.
+
+3. To parse a JSON input part by part (e.g. if you read the input by some
+   blocks from a file), use `json_dom_init()` + `json_dom_feed()` +
+   `json_dom_fini()`. Or alternatively, if you have whole input in a single
+   buffer, you may use `json_dom_parse()` which wraps the three functions.
+
+4. If the parsing succeeds, the result (document object model or DOM) forms
+   tree hierarchy of `VALUE` structures. Use all the power of the API in
+   `value.h` to query (or modify) the data stored in it.
+
+See comments in `src/json-dom.h` and `src/value.h` for more details about the
+API.
+
+### Outputting JSON
+
+If you also need to output JSON, you may use low-level helper utilities
+in `src/json.h` which are capable to output JSON numbers from C numeric types,
+or JSON strings from C strings, handling all the hard stuff of the JSON syntax
+like escaping of problematic characters. Writing the simple stuff like array or
+object brackets, value delimiters etc. is kept on the application's shoulders.
+
+Or, if you have DOM model represented by the `VALUE` structure hierarchy (as
+provided by the DOM parser or crafted manually), call just `json_dom_dump()`.
+This function, provided in `src/json-dom.h`, dumps the complete data hierarchy
+into a JSON stream. It supports few options for formatting the output in the
+desired way: E.g. it can indent the output to reflect the nesting of objects
+and arrays; and it can also minimize the output by skipping any non-meaningful
+whitespace altogether.
+
+In either cases, you have to implement a writer callback, which is capable to
+simply write down some sequence of bytes. This way, the application may save
+the output into a file; send it over a network or whatever it wishes to do
+with the stream.
 
 
 ## FAQ
