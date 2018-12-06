@@ -479,6 +479,223 @@ test_string(void)
 }
 
 static void
+test_string_c_escape(void)
+{
+    static const struct {
+        const char* input;
+        const char* output;
+    } vector[] = {
+        { "\"\\\"\"", "\"" },
+        { "\"\\\\\"", "\\" },
+        { "\"\\/\"", "/" },
+        { "\"\\b\"", "\b" },
+        { "\"\\f\"", "\f" },
+        { "\"\\n\"", "\n" },
+        { "\"\\r\"", "\r" },
+        { "\"\\t\"", "\t" },
+        { "\"\\u0001\"", "\x01" },
+        { "\"\\X\"", NULL },
+        { "\"\\uABC\"", NULL },
+        { "\"\\uAxBC\"", NULL },
+        { 0 }
+    };
+
+    int i;
+    int err;
+    VALUE root;
+
+    for(i = 0; vector[i].input != NULL; i++) {
+        err = parse(vector[i].input, NULL, 0, &root, NULL);
+        if(vector[i].output != NULL) {
+            TEST_CHECK(err == JSON_ERR_SUCCESS);
+            TEST_CHECK(strcmp(value_string(&root), vector[i].output) == 0);
+        } else {
+            TEST_CHECK(err == JSON_ERR_INVALIDESCAPE);
+        }
+        value_fini(&root);
+    }
+}
+
+static void
+test_string_utf8(void)
+{
+    static const struct {
+        const char* input;
+        const char* output;     /* NULL for ill-formed input. */
+        const char* output_ignore_ill_formed;
+        const char* output_fix_ill_formed;
+    } vector[] = {
+        /* Trivial text. */
+        { "\"foo\"", "foo", "foo", "foo" },
+
+        /* Correct UTF-8 text */
+        { "\"\xce\xba\xe1\xbd\xb9\xcf\x83\xce\xbc\xce\xb5\"",   /* Greek word 'kosme' */
+          "\xce\xba\xe1\xbd\xb9\xcf\x83\xce\xbc\xce\xb5",
+          "\xce\xba\xe1\xbd\xb9\xcf\x83\xce\xbc\xce\xb5",
+          "\xce\xba\xe1\xbd\xb9\xcf\x83\xce\xbc\xce\xb5" },
+
+        /* The smallest possible UTF-8 sequences of given length
+         * (except for 1 byte where we cannot use control characters) */
+        { "\"\x20\"", "\x20", "\x20", "\x20" },
+        { "\"\xc2\x80\"", "\xc2\x80", "\xc2\x80", "\xc2\x80" },
+        { "\"\xe0\xa0\x80\"", "\xe0\xa0\x80", "\xe0\xa0\x80", "\xe0\xa0\x80" },
+        { "\"\xf0\x90\x80\x80\"", "\xf0\x90\x80\x80", "\xf0\x90\x80\x80", "\xf0\x90\x80\x80" },
+
+        /* The largest possible UTF-8 sequences of given length */
+        { "\"\x7f\"", "\x7f", "\x7f", "\x7f" },
+        { "\"\xdf\xbf\"", "\xdf\xbf", "\xdf\xbf", "\xdf\xbf" },
+        { "\"\xef\xbf\xbf\"", "\xef\xbf\xbf", "\xef\xbf\xbf", "\xef\xbf\xbf" },
+        { "\"\xf4\x8f\xbf\xbf\"", "\xf4\x8f\xbf\xbf", "\xf4\x8f\xbf\xbf", "\xf4\x8f\xbf\xbf" },
+
+        /* Other boundary conditions */
+        { "\"\xed\x9f\xbf\"", "\xed\x9f\xbf", "\xed\x9f\xbf", "\xed\x9f\xbf" },
+        { "\"\xee\x80\x80\"", "\xee\x80\x80", "\xee\x80\x80", "\xee\x80\x80" },
+        { "\"\xef\xbf\xbd\"", "\xef\xbf\xbd", "\xef\xbf\xbd", "\xef\xbf\xbd" },
+
+        /* Orphan trailing byte(s) */
+        { "\"\x80\"", NULL, "\x80", "\xef\xbf\xbd" },
+        { "\"\xbf\"", NULL, "\xbf", "\xef\xbf\xbd" },
+        { "\"\x80\x80\"", NULL, "\x80\x80", "\xef\xbf\xbd\xef\xbf\xbd" },
+
+        /* Incomplete UTF-8 sequences */
+        { "\"\xc2\"", NULL, "\xc2", "\xef\xbf\xbd" },
+        { "\"\xe0\"", NULL, "\xe0", "\xef\xbf\xbd" },
+        { "\"\xe0\xa0\"", NULL, "\xe0\xa0", "\xef\xbf\xbd" },
+        { "\"\xf0\"", NULL, "\xf0", "\xef\xbf\xbd" },
+        { "\"\xf0\x90\"", NULL, "\xf0\x90", "\xef\xbf\xbd" },
+        { "\"\xf0\x90\x80\"", NULL, "\xf0\x90\x80", "\xef\xbf\xbd" },
+
+        /* Incomplete UTF-8 sequences in the middle of text */
+        { "\"foo\xc2""bar\"", NULL, "foo\xc2""bar", "foo\xef\xbf\xbd""bar" },
+        { "\"foo\xe0""bar\"", NULL, "foo\xe0""bar", "foo\xef\xbf\xbd""bar" },
+        { "\"foo\xe0\xa0""bar\"", NULL, "foo\xe0\xa0""bar", "foo\xef\xbf\xbd""bar" },
+        { "\"foo\xf0""bar\"", NULL, "foo\xf0""bar", "foo\xef\xbf\xbd""bar" },
+        { "\"foo\xf0\x90""bar\"", NULL, "foo\xf0\x90""bar", "foo\xef\xbf\xbd""bar" },
+        { "\"foo\xf0\x90\x80""bar\"", NULL, "foo\xf0\x90\x80""bar", "foo\xef\xbf\xbd""bar" },
+
+        /* 3 concatenated incomplete UTF-8 sequences */
+        { "\"\xc2\xf0\x90\x80\xe0\"", NULL, "\xc2\xf0\x90\x80\xe0", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
+
+        /* Over-long UTF-8 sequences. */
+        { "\"\xc0\xaf\"", NULL, "\xc0\xaf", "\xef\xbf\xbd\xef\xbf\xbd" },
+        { "\"\xc0\x80\xaf\"", NULL, "\xc0\x80\xaf", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
+
+        /* Codepoints reserved for UTF-16 surrogates. */
+        { "\"\xed\xa0\x80\"", NULL, "\xed\xa0\x80", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },   /* U+d800 */
+        { "\"\xed\xaf\xbf\"", NULL, "\xed\xaf\xbf", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },   /* U+dbff */
+        { "\"\xed\xb0\x80\"", NULL, "\xed\xb0\x80", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },   /* U+dc00 */
+        { "\"\xed\xbf\xbf\"", NULL, "\xed\xbf\xbf", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },   /* U+dfff */
+
+        { 0 }
+    };
+
+    int i;
+    int err;
+    JSON_CONFIG cfg_default;
+    JSON_CONFIG cfg_ignore_ill_formed;
+    JSON_CONFIG cfg_fix_ill_formed;
+    VALUE root;
+
+    json_default_config(&cfg_default);
+    json_default_config(&cfg_ignore_ill_formed);
+    cfg_ignore_ill_formed.flags |= JSON_IGNOREILLUTF8VALUE;
+    json_default_config(&cfg_fix_ill_formed);
+    cfg_fix_ill_formed.flags |= JSON_FIXILLUTF8VALUE;
+
+    for(i = 0; vector[i].input != NULL; i++) {
+        err = parse(vector[i].input, &cfg_default, 0, &root, NULL);
+        if(vector[i].output != NULL) {
+            TEST_CHECK(err == JSON_ERR_SUCCESS);
+            TEST_CHECK(strcmp(value_string(&root), vector[i].output) == 0);
+        } else {
+            TEST_CHECK(err == JSON_ERR_INVALIDUTF8);
+        }
+        value_fini(&root);
+
+        err = parse(vector[i].input, &cfg_ignore_ill_formed, 0, &root, NULL);
+        TEST_CHECK(vector[i].output_ignore_ill_formed != NULL);
+        TEST_CHECK(err == JSON_ERR_SUCCESS);
+        TEST_CHECK(strcmp(value_string(&root), vector[i].output_ignore_ill_formed) == 0);
+        value_fini(&root);
+
+        err = parse(vector[i].input, &cfg_fix_ill_formed, 0, &root, NULL);
+        TEST_CHECK(vector[i].output_fix_ill_formed != NULL);
+        TEST_CHECK(err == JSON_ERR_SUCCESS);
+        TEST_CHECK(strcmp(value_string(&root), vector[i].output_fix_ill_formed) == 0);
+        value_fini(&root);
+    }
+}
+
+static void
+test_string_unicode_escape(void)
+{
+    static const struct {
+        const char* input;
+        const char* output;         /* NULL for ill-formed input. */
+        const char* output_ignore_ill_formed;
+        const char* output_fix_ill_formed;
+    } vector[] = {
+        /* Simple Plane 0 (BMP) codepoints. */
+        { "\"\\u0001\"", "\x01", "\x01", "\x01" },
+        { "\"\\uabcd\"", "\xea\xaf\x8d", "\xea\xaf\x8d", "\xea\xaf\x8d" },
+        { "\"\\uABCD\"", "\xea\xaf\x8d", "\xea\xaf\x8d", "\xea\xaf\x8d" },
+        { "\"\\uAbCd\"", "\xea\xaf\x8d", "\xea\xaf\x8d", "\xea\xaf\x8d" },
+        { "\"\\uABCD\\uabcd\"", "\xea\xaf\x8d\xea\xaf\x8d", "\xea\xaf\x8d\xea\xaf\x8d", "\xea\xaf\x8d\xea\xaf\x8d" },
+        { "\"\\uffff\"", "\xef\xbf\xbf", "\xef\xbf\xbf", "\xef\xbf\xbf" },
+
+        /* Surrogate pairs. */
+        { "\"\\ud800\\udc00\"", "\xf0\x90\x80\x80", "\xf0\x90\x80\x80", "\xf0\x90\x80\x80" },
+        { "\"\\udbff\\udfff\"", "\xf4\x8f\xbf\xbf", "\xf4\x8f\xbf\xbf", "\xf4\x8f\xbf\xbf" },
+
+        /* Orphan surrogates. */
+        { "\"\\ud800\"", NULL, "\xed\xa0\x80", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
+        { "\"\\udbff\"", NULL, "\xed\xaf\xbf", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
+        { "\"\\udc00\"", NULL, "\xed\xb0\x80", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
+        { "\"\\udfff\"", NULL, "\xed\xbf\xbf", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
+
+        { 0 }
+    };
+
+    int i;
+    int err;
+    JSON_CONFIG cfg_default;
+    JSON_CONFIG cfg_ignore_ill_formed;
+    JSON_CONFIG cfg_fix_ill_formed;
+    VALUE root;
+
+    json_default_config(&cfg_default);
+    json_default_config(&cfg_ignore_ill_formed);
+    cfg_ignore_ill_formed.flags |= JSON_IGNOREILLUTF8VALUE;
+    json_default_config(&cfg_fix_ill_formed);
+    cfg_fix_ill_formed.flags |= JSON_FIXILLUTF8VALUE;
+
+    for(i = 0; vector[i].input != NULL; i++) {
+        err = parse(vector[i].input, &cfg_default, 0, &root, NULL);
+        if(vector[i].output != NULL) {
+            TEST_CHECK(err == JSON_ERR_SUCCESS);
+            TEST_CHECK(strcmp(value_string(&root), vector[i].output) == 0);
+        } else {
+            TEST_CHECK(err == JSON_ERR_INVALIDUTF8);
+        }
+        value_fini(&root);
+
+        err = parse(vector[i].input, &cfg_ignore_ill_formed, 0, &root, NULL);
+        TEST_CHECK(vector[i].output_ignore_ill_formed != NULL);
+        TEST_CHECK(err == JSON_ERR_SUCCESS);
+        TEST_CHECK(strcmp(value_string(&root), vector[i].output_ignore_ill_formed) == 0);
+        TEST_MSG("expected[%d]: %s", i, vector[i].output_ignore_ill_formed);
+        TEST_MSG("received[%d]: %s", i, value_string(&root));
+        value_fini(&root);
+
+        err = parse(vector[i].input, &cfg_fix_ill_formed, 0, &root, NULL);
+        TEST_CHECK(vector[i].output_fix_ill_formed != NULL);
+        TEST_CHECK(err == JSON_ERR_SUCCESS);
+        TEST_CHECK(strcmp(value_string(&root), vector[i].output_fix_ill_formed) == 0);
+        value_fini(&root);
+    }
+}
+
+static void
 test_array(void)
 {
     VALUE root;
@@ -1066,6 +1283,9 @@ TEST_LIST = {
     { "bool",                       test_bool },
     { "number",                     test_number },
     { "string",                     test_string },
+    { "string-c-escape",            test_string_c_escape },
+    { "string-utf8",                test_string_utf8 },
+    { "string-unicode-escape",      test_string_unicode_escape },
     { "array",                      test_array },
     { "object",                     test_object },
     { "combined",                   test_combined },

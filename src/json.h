@@ -169,6 +169,8 @@ typedef struct JSON_PARSER {
     unsigned state;
     unsigned substate;
 
+    uint32_t codepoint[2];
+
     char* buf;
     size_t buf_used;
     size_t buf_alloced;

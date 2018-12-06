@@ -255,6 +255,35 @@ json_buf_append(JSON_PARSER* parser, const char* data, size_t size)
     return 0;
 }
 
+static int
+json_buf_append_codepoint(JSON_PARSER* parser, uint32_t codepoint)
+{
+    char tmp[4];
+    size_t n;
+
+    if(codepoint <= 0x7f) {
+        tmp[0] = codepoint;
+        n = 1;
+    } else if(codepoint <= 0x7ff) {
+        tmp[0] = 0xc0 | ((codepoint >> 6) & 0x1f);
+        tmp[1] = 0x80 | ((codepoint >> 0) & 0x3f);
+        n = 2;
+    } else if(codepoint <= 0xffff) {
+        tmp[0] = 0xe0 | ((codepoint >> 12) & 0x0f);
+        tmp[1] = 0x80 | ((codepoint >> 6) & 0x3f);
+        tmp[2] = 0x80 | ((codepoint >> 0) & 0x3f);
+        n = 3;
+    } else {
+        tmp[0] = 0xf0 | ((codepoint >> 18) & 0x07);
+        tmp[1] = 0x80 | ((codepoint >> 12) & 0x3f);
+        tmp[2] = 0x80 | ((codepoint >> 6) & 0x3f);
+        tmp[3] = 0x80 | ((codepoint >> 0) & 0x3f);
+        n = 4;
+    }
+
+    return json_buf_append(parser, tmp, n);
+}
+
 
 /* Assuming ASCII compatibility here. */
 #define IS_IN(ch, ch_min, ch_max)   ((unsigned char)(ch_min) <= (unsigned char)(ch) && (unsigned char)(ch) <= (unsigned char)(ch_max))
@@ -264,6 +293,11 @@ json_buf_append(JSON_PARSER* parser, const char* data, size_t size)
 #define IS_TOKEN_BOUNDARY(ch)       (IS_WHITESPACE(ch) || IS_CONTROL(ch) || IS_PUNCT(ch))
 #define IS_ASCII(ch)                ((unsigned char)(ch) <= 127)
 #define IS_DIGIT(ch)                (IS_IN(ch, '0', '9'))
+#define IS_XDIGIT(ch)               (IS_DIGIT(ch) || IS_IN(ch, 'a', 'f') || IS_IN(ch, 'A', 'F'))
+
+#define IS_HI_SURROGATE(codepoint)  (0xd800 <= (codepoint)  &&  (codepoint) <= 0xdbff)
+#define IS_LO_SURROGATE(codepoint)  (0xdc00 <= (codepoint)  &&  (codepoint) <= 0xdfff)
+
 
 static size_t
 json_literal_automaton(JSON_PARSER* parser, const char* input, size_t size,
@@ -384,21 +418,48 @@ json_number_automaton(JSON_PARSER* parser, const char* input, size_t size)
     return off;
 }
 
+static inline unsigned
+json_resolve_xdigit(char ch)
+{
+    if(IS_DIGIT(ch))
+        return ch - '0';
+    else if(IS_IN(ch, 'a', 'f'))
+        return ch - 'a' + 10;
+    else
+        return ch - 'A' + 10;
+}
+
+/* U+fffd (Unicode replacement character), encoded in UTF-8.
+ *
+ * Note we sometimes need to use three, if we meet incorrect "\uABCD" escape
+ * sequence corresponding to an orphan surrogate, due the "best practice" of
+ * replacement character usage recommended in Unicode 10 standard:
+ *
+ * (Every orphan surrogate would be, in UTF-8, encoded as an 3-byte sequence.
+ * The first (leading) byte forms longest good subsequence replaced by single
+ * U+fffd. The two trailing bytes, who cannot really follow in well-formed
+ * UTF-8, then are replaced with U+fffd each too.)
+ */
+static const char fffd[9] = { 0xef, 0xbf, 0xbd, 0xef, 0xbf, 0xbd, 0xef, 0xbf, 0xbd };
+static const size_t fffd_size = 3;
+
+static int
+json_handle_ill_surrogate(JSON_PARSER* parser, uint32_t codepoint, int ignore, int fix)
+{
+    if(ignore)
+        return json_buf_append_codepoint(parser, codepoint);
+
+    if(fix)
+        return json_buf_append(parser, fffd, 3 * fffd_size);
+
+    json_raise(parser, JSON_ERR_INVALIDUTF8);
+    return -1;
+}
+
 static size_t
 json_string_automaton(JSON_PARSER* parser, const char* input, size_t size,
                       JSON_TYPE type)
 {
-    /* TODO:
-     *
-     *  -- Support for long escape sequences ("\u1234"); including surrogate
-     *     pairs ("\u1234\u5678").
-     *
-     *  -- Check for limits (max_key_len; max_string_len).
-     */
-
-    /* U+fffd (Unicode replacement character), encoded in UTF-8. */
-    static const char fffd[3] = { 0xef, 0xbf, 0xbd };
-
     int ignore_ill_utf8;
     int fix_ill_utf8;
     size_t max_len;
@@ -488,32 +549,34 @@ json_string_automaton(JSON_PARSER* parser, const char* input, size_t size,
                  */
                 if(IS_IN(ch, 0xc2, 0xdf)) {
                     parser->substate = 1;
-                } else if(ch == 0xe0) {
+                } else if((unsigned char) ch == 0xe0) {
                     parser->substate = 4;
                 } else if(IS_IN(ch, 0xe1, 0xec)) {
                     parser->substate = 2;
-                } else if(ch == 0xed) {
+                } else if((unsigned char) ch == 0xed) {
                     parser->substate = 5;
                 } else if(IS_IN(ch, 0xee, 0xef)) {
                     parser->substate = 2;
-                } else if(ch == 0xf0) {
+                } else if((unsigned char) ch == 0xf0) {
                     parser->substate = 6;
                 } else if(IS_IN(ch, 0xf1, 0xf3)) {
                     parser->substate = 3;
-                } else if(ch == 0xf4) {
+                } else if((unsigned char) ch == 0xf4) {
                     parser->substate = 7;
                 } else if(fix_ill_utf8) {
-                    if(json_buf_append(parser, fffd, sizeof(fffd)) != 0)
+                    if(json_buf_append(parser, fffd, fffd_size) != 0)
                         break;
                 } else {
                     json_raise(parser, JSON_ERR_INVALIDUTF8);
                     break;
                 }
 
-                if(json_buf_append(parser, &ch, 1) != 0)
-                    break;
+                if(parser->substate != 0) {
+                    if(json_buf_append(parser, &ch, 1) != 0)
+                        break;
+                }
             }
-        } else if(parser->substate <= 6) {
+        } else if(parser->substate <= 7) {
             /* Should be trailing UTF-8 byte. */
             if(parser->substate <= 3  &&  ((unsigned char)(ch) & 0xc0) == 0x80) {
                 parser->substate--;
@@ -546,7 +609,7 @@ json_string_automaton(JSON_PARSER* parser, const char* input, size_t size,
                 while(((unsigned char)(parser->buf[parser->buf_used-1]) & 0xc0) == 0x80)
                     parser->buf_used--; /* Cancel all the trailing bytes. */
                 parser->buf_used--;     /* Cancel the leading byte. */
-                if(json_buf_append(parser, fffd, sizeof(fffd)) != 0)
+                if(json_buf_append(parser, fffd, fffd_size) != 0)
                     break;
 
                 /* And now we have to replay the current byte in state == 0
@@ -563,22 +626,103 @@ json_string_automaton(JSON_PARSER* parser, const char* input, size_t size,
                 break;
         } else if(parser->substate == '\\') {
             /* Handle 2nd character of an escape sequence. */
-            switch(ch) {
-                case '\"':  ch = '\"'; break;
-                case '\\':  ch = '\\'; break;
-                case '/':   ch = '/'; break;
-                case 'b':   ch = '\b'; break;
-                case 'f':   ch = '\f'; break;
-                case 'n':   ch = '\n'; break;
-                case 'r':   ch = '\r'; break;
-                case 't':   ch = '\t'; break;
-                //case 'u': // TODO (unicode codepoint (<=0xffff) follows).
-                default:    json_raise(parser, JSON_ERR_INVALIDESCAPE); return off;
+            if(ch == 'u') {
+                /* Expecting 4 hex digits. */
+                parser->substate = 0xabcd + 4;
+            } else {
+                switch(ch) {
+                    case '\"':  ch = '\"'; break;
+                    case '\\':  ch = '\\'; break;
+                    case '/':   ch = '/'; break;
+                    case 'b':   ch = '\b'; break;
+                    case 'f':   ch = '\f'; break;
+                    case 'n':   ch = '\n'; break;
+                    case 'r':   ch = '\r'; break;
+                    case 't':   ch = '\t'; break;
+                    default:    json_raise(parser, JSON_ERR_INVALIDESCAPE); return off;
+                }
+
+                if(json_buf_append(parser, &ch, 1) != 0)
+                    break;
+                parser->substate = 0;
+            }
+        } else if(parser->substate > 0xabcd) {
+            /* Handle body of the '\uABCD' style escape.
+             *
+             * This is quite complex because JSON standard allows either
+             * any non-surrogate codepoint <= U+ffff or two long escapes
+             * forming UTF-16 surrogate pair for codepoints > U+ffff.
+             *
+             * Naturally, surrogate codepoints not forming the pair (e.g.
+             * orphan or two hi surrogates) make ill-formed UTF-8 string.
+             */
+            if(!IS_XDIGIT(ch)) {
+                json_raise(parser, JSON_ERR_INVALIDESCAPE);
+                return off;
             }
 
-            if(json_buf_append(parser, &ch, 1) != 0)
-                break;
-            parser->substate = 0;
+            parser->codepoint[1] <<= 4;
+            parser->codepoint[1] |= json_resolve_xdigit(ch);
+            parser->substate--;
+
+            if(parser->substate == 0xabcd) {
+                /* We have completed the long escape. */
+                if(parser->codepoint[0] != 0  &&  !IS_LO_SURROGATE(parser->codepoint[1])) {
+                    /* parser->codepoint[0] is unexpected high surrogate. */
+                    if(json_handle_ill_surrogate(parser, parser->codepoint[0], ignore_ill_utf8, fix_ill_utf8) != 0)
+                        break;
+
+                    /* Propagate below to handle parser->codepoint[1] as if no
+                     * high surrogate precedes. */
+                    parser->codepoint[0] = 0;
+                }
+
+                if(parser->codepoint[0] == 0  &&  IS_LO_SURROGATE(parser->codepoint[1])) {
+                    /* parser->codepoint[1] is unexpected low surrogate. */
+                    if(json_handle_ill_surrogate(parser, parser->codepoint[1], ignore_ill_utf8, fix_ill_utf8) != 0)
+                        break;
+                    parser->substate = 0;
+                } else if(parser->codepoint[0] != 0  &&  IS_LO_SURROGATE(parser->codepoint[1])) {
+                    /* parser->codepoint[0] & [1] form valid surrogate pair. */
+                    uint32_t hi = parser->codepoint[0];
+                    uint32_t lo = parser->codepoint[1];
+                    uint32_t codepoint = 0x10000 + (hi - 0xd800) * 0x400 + (lo - 0xdc00);
+                    if(json_buf_append_codepoint(parser, codepoint) != 0)
+                        break;
+                    parser->substate = 0;
+                } else if(IS_HI_SURROGATE(parser->codepoint[1])) {
+                    /* parser->codepoint[1] is high surrogate. Store it and we
+                     * see later if low surrogate follows. */
+                    parser->codepoint[0] = parser->codepoint[1];
+                    parser->substate = 0xabcd - 2;
+                } else {
+                    /* parser->codepoint[1] is non-surrogate codepoint. */
+                    if(json_buf_append_codepoint(parser, parser->codepoint[1]) != 0)
+                        break;
+                    parser->substate = 0;
+                }
+
+                parser->codepoint[1] = 0;
+            }
+        } else if(parser->substate >= 0xabcd - 2) {
+            /* We are just after high surrogate and expect another long escape,
+             * this time for the low surrogate. */
+            if(parser->substate == 0xabcd - 2  &&  ch == '\\') {
+                parser->substate = 0xabcd - 1;
+            } else if(parser->substate == 0xabcd - 1  &&  ch == 'u') {
+                parser->substate = 0xabcd + 4;
+            } else {
+                if(json_handle_ill_surrogate(parser, parser->codepoint[0], ignore_ill_utf8, fix_ill_utf8) != 0)
+                    break;
+
+                /* Replay the current byte as if no high surrogate precedes. */
+                parser->codepoint[0] = 0;
+                parser->substate = (parser->substate == 0xabcd - 1) ? '\\' : 0;
+                continue;
+            }
+        } else {
+            json_raise(parser, JSON_ERR_INTERNAL);
+            break;
         }
 
         off++;
