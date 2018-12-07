@@ -158,6 +158,9 @@ typedef struct JSON_PARSER {
 
     JSON_INPUT_POS pos;
     JSON_INPUT_POS value_pos;
+    JSON_INPUT_POS err_pos;
+
+    int errcode;
 
     size_t value_counter;
 
@@ -176,8 +179,6 @@ typedef struct JSON_PARSER {
     size_t buf_alloced;
 
     size_t last_cl_offset;  /* Offset of most recently seen '\r' */
-
-    int errcode;
 } JSON_PARSER;
 
 

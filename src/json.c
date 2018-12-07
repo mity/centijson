@@ -107,21 +107,25 @@ json_init(JSON_PARSER* parser, const JSON_CALLBACKS* callbacks,
 }
 
 static void
-json_raise(JSON_PARSER* parser, int errcode)
-{
-    /* Keep the primary error. */
-    if(parser->errcode == 0)
-        parser->errcode = errcode;
-}
-
-static void
-json_raise_for_value(JSON_PARSER* parser, int errcode)
+json_raise_(JSON_PARSER* parser, int errcode, JSON_INPUT_POS* pos)
 {
     /* Keep the primary error. */
     if(parser->errcode == 0) {
         parser->errcode = errcode;
-        memcpy(&parser->pos, &parser->value_pos, sizeof(JSON_INPUT_POS));
+        memcpy(&parser->err_pos, pos, sizeof(JSON_INPUT_POS));
     }
+}
+
+static inline  void
+json_raise(JSON_PARSER* parser, int errcode)
+{
+    json_raise_(parser, errcode, &parser->pos);
+}
+
+static inline void
+json_raise_for_value(JSON_PARSER* parser, int errcode)
+{
+    json_raise_(parser, errcode, &parser->value_pos);
 }
 
 static void
@@ -880,18 +884,22 @@ int
 json_fini(JSON_PARSER* parser, JSON_INPUT_POS* p_pos)
 {
     /* Some automaton may need some flushing. */
-    if(parser->automaton != AUTOMATON_MAIN) {
-        parser->pos.offset += json_dispatch(parser, NULL, 0);
-
+    if(parser->errcode == 0) {
         if(parser->automaton != AUTOMATON_MAIN) {
-            json_raise(parser, JSON_ERR_SYNTAX);
+            parser->pos.offset += json_dispatch(parser, NULL, 0);
+
+            if(parser->automaton != AUTOMATON_MAIN) {
+                json_raise(parser, JSON_ERR_SYNTAX);
+            }
+        } else if(parser->nesting_level != 0  ||  !(parser->state & CAN_SEE_EOF)) {
+            json_raise_unexpected(parser);
         }
-    } else if(parser->nesting_level != 0  ||  !(parser->state & CAN_SEE_EOF)) {
-        json_raise_unexpected(parser);
     }
 
-    if(p_pos != NULL)
-        memcpy(p_pos, &parser->pos, sizeof(JSON_INPUT_POS));
+    if(p_pos != NULL) {
+        memcpy(p_pos, (parser->errcode == 0) ? &parser->pos : &parser->err_pos,
+                sizeof(JSON_INPUT_POS));
+    }
 
     free(parser->nesting_stack);
     free(parser->buf);
