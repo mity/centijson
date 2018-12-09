@@ -75,7 +75,8 @@ From http://json.org:
     it is not bound to the JSON parser implementation in any way, so you can
     reuse it for other purposes.
 
-  * **JSON pointer:** JSON pointer implementation, as specified by [RFC-6901].
+  * **JSON pointer:** JSON pointer module, `json-ptr.h` + `json-ptr.c`, as
+    specified by [RFC-6901].
 
 * **Streaming:** Ability to feed the parser with JSON input step by step, in
   blocks of size the application chooses.
