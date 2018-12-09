@@ -6,6 +6,8 @@ add_library(json STATIC
     json.h
     json-dom.c
     json-dom.h
+    json-ptr.c
+    json-ptr.h
     value.c
     value.h
 )

@@ -27,7 +27,7 @@ From http://json.org:
 * **Size:** The code and memory footprint is quite small.
 
 * **Standard compliance** High emphasis is put on correctness and compliance
-  with the JSON standards [ECMA-404] and [RFC-8259]. That includes:
+  with the JSON standards [ECMA-404], [RFC-8259] and [RFC-6901]. That includes:
 
   * **Full input validation:** During the parsing, CentiJSON verifies that the
     input forms valid JSON.
@@ -74,6 +74,8 @@ From http://json.org:
     [C Reusables](http://github.com/mity/c-reusables) is very versatile and
     it is not bound to the JSON parser implementation in any way, so you can
     reuse it for other purposes.
+
+  * **JSON pointer:** JSON pointer implementation, as specified by [RFC-6901].
 
 * **Streaming:** Ability to feed the parser with JSON input step by step, in
   blocks of size the application chooses.
@@ -138,7 +140,7 @@ categories.
 to see the section below about the DOM Parser and ignore this section.)
 
 If you want to use just the SAX-like parser, you need, in a nutshell, follow
-these steps.
+these steps:
 
 1. Incorporate `src/json.h` and `src/json.c` into your project.
 
@@ -173,9 +175,10 @@ See comments in `src/json.h` for more details about the API.
 
 ### DOM Parser
 
-To use just the DOM parser, follows these steps:
+To use just the DOM parser, follow these steps:
 
-1. Incorporate all the sources in the `src` directory into your project.
+1. Incorporate the sources `json.h`, `json.c`, `json-dom.h`, `json-dom.c`,
+   `value.h` and `value.c` in the `src` directory into your project.
 
 2. Use `#include "json-dom.h"` in all relevant sources of your projects where
    you deal with JSON parsing, and `#include "value.h"` in all sources where
@@ -192,6 +195,12 @@ To use just the DOM parser, follows these steps:
 
 See comments in `src/json-dom.h` and `src/value.h` for more details about the
 API.
+
+### JSON Pointer
+
+The JSON pointer module is an optional module on top of the DOM parser. To use
+it, follow the instructions for the DOM parser, and add also the sources
+`json-ptr.h` and `json-ptr.c` into your project.
 
 ### Outputting JSON
 
@@ -311,3 +320,5 @@ get fixed. You can submit bug reports here:
 
 [ECMA-404]: http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf
 [RFC-8259]: https://tools.ietf.org/html/rfc8259
+[RFC-6901]: https://tools.ietf.org/html/rfc6901
+

@@ -26,6 +26,7 @@
 #include "acutest.h"
 #include "json.h"
 #include "json-dom.h"
+#include "json-ptr.h"
 #include "value.h"
 
 
@@ -1296,6 +1297,107 @@ test_dump(void)
     value_fini(&root);
 }
 
+static void
+test_pointer(void)
+{
+    static const char input[] =
+            "{\n"
+                "\"foo\": [\"bar\", \"baz\"],\n"
+                "\"\": 0,\n"
+                "\"a/b\": 1,\n"
+                "\"c%d\": 2,\n"
+                "\"e^f\": 3,\n"
+                "\"g|h\": 4,\n"
+                "\"i\\\\j\": 5,\n"
+                "\"k\\\"l\": 6,\n"
+                "\" \": 7,\n"
+                "\"m~n\": 8\n"
+            "}\n";
+
+    VALUE root;
+    VALUE* v;
+
+    TEST_CHECK(json_dom_parse(input, strlen(input), NULL, 0, &root, NULL) == 0);
+
+#if 0
+    TEST_CHECK(json_ptr_get(&root, "") == &root);
+
+    v = json_ptr_get(&root, "/foo");
+    TEST_CHECK(value_type(v) == VALUE_ARRAY);
+    TEST_CHECK(value_array_size(v) == 2);
+    TEST_CHECK(strcmp(value_string(value_array_get(v, 0)), "bar") == 0);
+    TEST_CHECK(strcmp(value_string(value_array_get(v, 1)), "baz") == 0);
+
+    v = json_ptr_get(&root, "/foo/0");
+    TEST_CHECK(strcmp(value_string(v), "bar") == 0);
+
+    v = json_ptr_get(&root, "/foo/1");
+    TEST_CHECK(strcmp(value_string(v), "baz") == 0);
+
+    v = json_ptr_get(&root, "/foo/-2");
+    TEST_CHECK(strcmp(value_string(v), "bar") == 0);
+
+    v = json_ptr_get(&root, "/foo/-1");
+    TEST_CHECK(strcmp(value_string(v), "baz") == 0);
+
+    v = json_ptr_get(&root, "/");
+    TEST_CHECK(value_int32(v) == 0);
+
+    v = json_ptr_get(&root, "/a~1b");
+    TEST_CHECK(value_int32(v) == 1);
+
+    v = json_ptr_get(&root, "/c%d");
+    TEST_CHECK(value_int32(v) == 2);
+
+    v = json_ptr_get(&root, "/e^f");
+    TEST_CHECK(value_int32(v) == 3);
+
+    v = json_ptr_get(&root, "/g|h");
+    TEST_CHECK(value_int32(v) == 4);
+
+    v = json_ptr_get(&root, "/i\\j");
+    TEST_CHECK(value_int32(v) == 5);
+
+    v = json_ptr_get(&root, "/k\"l");
+    TEST_CHECK(value_int32(v) == 6);
+
+    v = json_ptr_get(&root, "/ ");
+    TEST_CHECK(value_int32(v) == 7);
+
+    v = json_ptr_get(&root, "/m~0n");
+    TEST_CHECK(value_int32(v) == 8);
+
+    v = json_ptr_get(&root, "/xyz");
+    TEST_CHECK(v == NULL);
+
+    v = json_ptr_add(&root, "/xyz");
+    TEST_CHECK(v != NULL);
+    TEST_CHECK(value_is_new(v));
+    value_init_int32(v, 42);
+
+    v = json_ptr_get_or_add(&root, "xyz");
+    TEST_CHECK(value_int32(v) == 42);
+
+    v = json_ptr_get_or_add(&root, "xyz2");
+    TEST_CHECK(v != NULL);
+    TEST_CHECK(value_is_new(v));
+#endif
+    json_ptr_add(&root, "/foo/-");
+    json_ptr_add(&root, "/foo/-");
+    v = json_ptr_get(&root, "/foo");
+    TEST_CHECK(value_type(v) == VALUE_ARRAY);
+    TEST_CHECK(value_array_size(v) == 4);
+    TEST_CHECK(value_is_new(value_array_get(v, 2)));
+    TEST_CHECK(value_is_new(value_array_get(v, 3)));
+
+    v = json_ptr_add(&root, "");    /* Cannot add root. */
+    TEST_CHECK(v == NULL);
+
+    v = json_ptr_get_or_add(&root, "");
+    TEST_CHECK(v == &root);
+
+    value_fini(&root);
+}
 
 
 TEST_LIST = {
@@ -1322,5 +1424,6 @@ TEST_LIST = {
     { "err-syntax",                 test_err_syntax },
     { "json-checker",               test_json_checker },
     { "dump",                       test_dump },
+    { "pointer",                    test_pointer },
     { 0 }
 };
