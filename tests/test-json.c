@@ -1319,7 +1319,6 @@ test_pointer(void)
 
     TEST_CHECK(json_dom_parse(input, strlen(input), NULL, 0, &root, NULL) == 0);
 
-#if 0
     TEST_CHECK(json_ptr_get(&root, "") == &root);
 
     v = json_ptr_get(&root, "/foo");
@@ -1381,7 +1380,7 @@ test_pointer(void)
     v = json_ptr_get_or_add(&root, "xyz2");
     TEST_CHECK(v != NULL);
     TEST_CHECK(value_is_new(v));
-#endif
+
     json_ptr_add(&root, "/foo/-");
     json_ptr_add(&root, "/foo/-");
     v = json_ptr_get(&root, "/foo");
