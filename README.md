@@ -37,10 +37,10 @@ From http://json.org:
     All JSON escape sequences are automatically translated to their respective
     Unicode counterparts.
 
-  * **Diagnostics:** In the case of invalid input, you get more then just some
-    failure flag, but full information about nature of the issue, and also an
-    information where in the document it has happened (offset as well as the
-    line and column numbers are provided).
+* **Diagnostics:** In the case of invalid input, you get more then just some
+  failure flag, but full information about nature of the issue, and also an
+  information where in the document it has happened (offset as well as the
+  line and column numbers are provided).
 
 * **Security:** CentiJSON is intended to be usable even in situations where
   your application reads JSON from an untrusted source. That includes:
@@ -80,6 +80,14 @@ From http://json.org:
 
 * **Streaming:** Ability to feed the parser with JSON input step by step, in
   blocks of size the application chooses.
+
+* **Serialization:**
+
+  * **Low-level serialization:** `json.h` provides functions for outputting the
+    non-trivial stuff like strings or numbers from C numeric types.
+
+  * **High-level:** `json-dom.h` provides function `json_dom_dump()` which is
+    capable to serialize whole DOM hierarchy.
 
 * **Performance:** The data storage provides great performance.
 
@@ -229,9 +237,9 @@ with the stream.
 
 **Q: Why `value.h` does not provide any API for objects?**
 
-**A:** That module is not designed to be JSON-specific, and the term "object"
-as JSON uses it somewhat misleading outside of that context, so `value.h` uses
-the term "dictionary" instead.
+**A:** That module is not designed to be JSON-specific. The term "object", as
+used in JSON context, is somewhat misleading outside of the context. Therefore
+`value.h` instead uses more descriptive term "dictionary".
 
 The following table shows how are JSON types translated to their counterparts
 in `value.h`:
@@ -267,10 +275,17 @@ rules (in this order; 1st one suitable is used.)
    into `VALUE_UINT64`, then it shall be `VALUE_UINT64`.
  * In all other cases, it shall be `VALUE_DOUBLE`.
 
-That said, note that whatever numeric type is used for actually storing the
+That said, note that whatever numeric type is actually used for storing the
 value, the getter functions of all those numeric values are capable to convert
-the value into another C type. Naturally, the conversion may exhibit similar
-limitations as C casting, including data loss or rounding errors.
+the value into another C numeric types.
+
+For example, you may use getter function `value_get_int32()` not only for values
+of the type `VALUE_INT32`, but for all the numeric values including e.g.
+`VALUE_INT64` or `VALUE_DOUBLE`.
+
+Naturally, the conversion may exhibit similar limitations as C casting,
+including data loss (e.g. in the overflow situation) or rounding errors (e.g.
+in double to integer conversion).
 
 See the comments in the header `value.h` for more details.
 
@@ -281,8 +296,8 @@ application and intended to be used as mitigation against Denial-of-Service
 attacks.
 
 Application can instruct the parser to use no limits by providing appropriately
-filled `JSON_CONFIG` structure to `json_init()`. The only limitation are then
-properties of your machine and OS.
+filled `JSON_CONFIG` structure to `json_init()`. The only limitations are then
+imposed by properties of your machine and OS.
 
 **Q: Is CentiJSON thread-safe?**
 
