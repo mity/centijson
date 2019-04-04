@@ -1,6 +1,5 @@
 [![Build status (travis-ci.com)](https://img.shields.io/travis/mity/centijson/master.svg?label=linux%20build)](https://travis-ci.org/mity/centijson)
 [![Build status (appveyor.com)](https://img.shields.io/appveyor/ci/mity/centijson/master.svg?label=windows%20build)](https://ci.appveyor.com/project/mity/centijson/branch/master)
-[![Coverity Scan Build Status](https://img.shields.io/coverity/scan/mity-centijson.svg?label=coverity%20scan)](https://scan.coverity.com/projects/mity-centijson)
 [![Codecov](https://img.shields.io/codecov/c/github/mity/centijson/master.svg?label=code%20coverage)](https://codecov.io/github/mity/centijson)
 
 # CentiJSON Readme
