@@ -67,7 +67,8 @@ From http://json.org:
     the fly.
 
   * **Full DOM parser:** `json-dom.h` + `json-dom.c` implements such DOM
-    builder on top of the SAX-like parser which populates the data storage.
+    builder on top of the SAX-like parser which populates the data storage
+    implemented in `value.h` + `value.c`.
 
   * **Data storage:** The data storage module, `value.h` + `value.c` from
     [C Reusables](http://github.com/mity/c-reusables) is very versatile and
@@ -131,7 +132,7 @@ this list:
   full escape sequence resolution, or fall into troubles if any string contains
   U+0000 (`"foo\u0000bar"`).
 
-In the 2nd category, there are far less numerous, but very huge beasts which
+In the 2nd category, they are far less numerous, but very huge beasts which
 provide many scores of functions, which provide very complicated data
 abstraction layers and baroque interfaces, and they are simply too big and
 complicated for my taste or needs or will to incorporate them in my projects.
@@ -168,7 +169,7 @@ these steps:
    Or alternatively, if you have whole input in a single buffer, you may use
    `json_parse()` which wraps the three functions.
 
-Note, that CentiJSON fully verifies correctness the input. But it is done on
+Note that CentiJSON fully verifies correctness the input. But it is done on
 the fly. Hence, if you feed the parser with broken JSON file, your callback
 function can see e.g. a beginning of an array but not its end, if in the mean
 time the parser aborts due to an error.
@@ -255,7 +256,7 @@ in `value.h`:
 
 **Q: How does CentiJSON deal with numbers?**
 
-**A:** It's true that the untyped notion of number as JSON specifies it is
+**A:** It's true that the untyped notion of number, as JSON specifies it, is
 little bit complicated for languages like C.
 
 On the SAX-like parser level, the syntax of numbers is verified accordingly
@@ -290,13 +291,13 @@ See the comments in the header `value.h` for more details.
 
 **Q: Are there any hard-coded limits?**
 
-**A:** No. There are only soft-limits, configurable in run time by the
+**A:** No. There are only soft limits, configurable in run time by the
 application and intended to be used as mitigation against Denial-of-Service
 attacks.
 
 Application can instruct the parser to use no limits by providing appropriately
-filled `JSON_CONFIG` structure to `json_init()`. The only limitations are then
-imposed by properties of your machine and OS.
+setup `JSON_CONFIG` to `json_init()`. The only limitations are then imposed by
+properties of your machine and OS.
 
 **Q: Is CentiJSON thread-safe?**
 
@@ -304,13 +305,13 @@ imposed by properties of your machine and OS.
 machine is capable of. There is no global state and no need to synchronize
 as long as each thread uses different parser instance.
 
-(Of course, do not try parallelizing parsing of single document. That makes
+(Of course, do not try parallelizing parsing of a single document. That makes
 no sense, given the nature of JSON format.)
 
 **Q: CentiJSON? Why such a horrible name?**
 
 **A:** First, because I am poor in naming things. Second, because CentiJSON is
-bigger then all those picojsons, nanojsons or microjsons, but it's still quite
+bigger then all those picojsons, nanojsons or microjsons; yet it's still quite
 small, as the prefix suggests. Third, because it begins with the letter 'C',
 and that refers to the C language. Forth, because the name reminds centipedes
 and centipedes belong to Arthropods. The characteristic feature of this group
