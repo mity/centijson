@@ -1236,6 +1236,7 @@ json_dump_double(double d, int (*write_func)(const char*, size_t, void*), void* 
                 free(buffer);
                 return JSON_ERR_OUTOFMEMORY;
             }
+            buffer = new_buffer;
 
             n = snprintf(buffer, capacity, fmt, d);
             if(n >= 0  &&  n < capacity)
