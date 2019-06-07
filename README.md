@@ -121,9 +121,9 @@ this list:
   data in the JSON document), so searching the object by the key is operation
   of linear complexity.
 
-  That may be good enough if you really **know** that all the input will be
+  (That may be good enough if you really **know** that all the input will be
   always small. But allow any black hat feed it with some bigger beast and you
-  have Denial of Service faster then you spell it.
+  have Denial of Service faster then you spell it.)
 
 * Those really small ones usually often lack possibility of modifying the tree
   of the data, like adding new items into arrays or dictionaries, or removing
@@ -149,8 +149,7 @@ categories.
 (Disclaimer: If you don't know what SAX-like Parser means, you likely want
 to see the section below about the DOM Parser and ignore this section.)
 
-If you want to use just the SAX-like parser, you need, in a nutshell, follow
-these steps:
+If you want to use just the SAX-like parser, follow these steps:
 
 1. Incorporate `src/json.h` and `src/json.c` into your project.
 
@@ -264,24 +263,24 @@ On the SAX-like parser level, the syntax of numbers is verified accordingly
 to the JSON standards and provided to the callback as verbatim string.
 
 The provided DOM builder (`json-dom.h`) tries to guess most appropriate C type
-how to store the number to mitigate any data loss, by following the following
-rules (in this order; 1st one suitable is used.)
- * If there is no fraction and no exponent part and the integer fits into
+how to store the number to mitigate any data loss by the following heuristics
+(in this order; the 1st suitable rule is used.):
+1. If there is no fraction and no exponent part and the integer fits into
    `VALUE_INT32`, then it shall be `VALUE_INT32`.
- * If there is no minus sign, no fraction or exponent part and the integer fits
+2. If there is no minus sign, no fraction or exponent part and the integer fits
    into `VALUE_UINT32`, then it shall be `VALUE_UINT32`.
- * If there is no fraction and no exponent part and the integer fits into
+3. If there is no fraction and no exponent part and the integer fits into
    `VALUE_INT64`, then it shall be `VALUE_INT64`.
- * If there is no minus sign, no fraction or exponent part and the integer fits
+4. If there is no minus sign, no fraction or exponent part and the integer fits
    into `VALUE_UINT64`, then it shall be `VALUE_UINT64`.
- * In all other cases, it shall be `VALUE_DOUBLE`.
+5. In all other cases, it shall be `VALUE_DOUBLE`.
 
 That said, note that whatever numeric type is actually used for storing the
 value, the getter functions of all those numeric values are capable to convert
 the value into another C numeric types.
 
 For example, you may use getter function `value_get_int32()` not only for values
-of the type `VALUE_INT32`, but for all the numeric values including e.g.
+of the type `VALUE_INT32`, but also for the other numeric values, e.g.
 `VALUE_INT64` or `VALUE_DOUBLE`.
 
 Naturally, the conversion may exhibit similar limitations as C casting,
@@ -296,9 +295,9 @@ See the comments in the header `value.h` for more details.
 application and intended to be used as mitigation against Denial-of-Service
 attacks.
 
-Application can instruct the parser to use no limits by providing appropriately
-setup `JSON_CONFIG` to `json_init()`. The only limitations are then imposed by
-properties of your machine and OS.
+Application can instruct the parser to use no limits by appropriate setup of
+the structure `JSON_CONFIG` passed to `json_init()`. The only limitations are
+then imposed by properties of your machine and OS.
 
 **Q: Is CentiJSON thread-safe?**
 
