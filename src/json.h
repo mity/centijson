@@ -82,21 +82,21 @@ typedef enum JSON_TYPE {
 
 /* Bits for JSON_CONFIG::flags.
  */
-#define JSON_NONULLASROOT           0x0001  /* Allow to be root value */
-#define JSON_NOBOOLASROOT           0x0002  /* Allow false or true to be root value */
-#define JSON_NONUMBERASROOT         0x0004  /* Allow number to be root value */
-#define JSON_NOSTRINGASROOT         0x0008  /* Allow string to be root value */
-#define JSON_NOARRAYASROOT          0x0010  /* Allow array to be root value */
-#define JSON_NOOBJECTASROOT         0x0020  /* Allow object  to be root value */
+#define JSON_NONULLASROOT           0x0001  /* Disallow null to be root value */
+#define JSON_NOBOOLASROOT           0x0002  /* Disallow false or true to be root value */
+#define JSON_NONUMBERASROOT         0x0004  /* Disallow number to be root value */
+#define JSON_NOSTRINGASROOT         0x0008  /* Disallow string to be root value */
+#define JSON_NOARRAYASROOT          0x0010  /* Disallow array to be root value */
+#define JSON_NOOBJECTASROOT         0x0020  /* Disallow object  to be root value */
 
 #define JSON_NOSCALARROOT           (JSON_NONULLASROOT | JSON_NOBOOLASROOT |  \
                                      JSON_NONUMBERASROOT | JSON_NOSTRINGASROOT)
 #define JSON_NOVECTORROOT           (JSON_NOARRAYASROOT | JSON_NOOBJECTASROOT)
 
 #define JSON_IGNOREILLUTF8KEY       0x0100  /* Ignore ill-formed UTF-8 (for keys). */
-#define JSON_FIXILLUTF8KEY          0x0200  /* Replace ill-formed UTF-8 with replacement char (for keys). */
+#define JSON_FIXILLUTF8KEY          0x0200  /* Replace ill-formed UTF-8 char with replacement char (for keys). */
 #define JSON_IGNOREILLUTF8VALUE     0x0400  /* Ignore ill-formed UTF-8 (for string values). */
-#define JSON_FIXILLUTF8VALUE        0x0800  /* Replace ill-formed UTF-8 with replacement char (for string values). */
+#define JSON_FIXILLUTF8VALUE        0x0800  /* Replace ill-formed UTF-8 char with replacement char (for string values). */
 
 
 
@@ -219,7 +219,7 @@ int json_feed(JSON_PARSER* parser, const char* input, size_t size);
  *
  * Also note this function may still fail even if all preceding calls to
  * json_feed() succeeded. This typically happens if the processed JSON input
- * was not complete valid JSON document.
+ * was an incomplete JSON document.
  */
 int json_fini(JSON_PARSER* parser, JSON_INPUT_POS* p_pos);
 
@@ -257,7 +257,7 @@ void json_analyze_number(const char* num, size_t num_size,
  * json_analyze_number() says it is fine.
  *
  * And also note that json_number_to_double() can fail with JSON_ERR_OUTOFMEMORY.
- * Hence it prototype differs.
+ * Hence its prototype differs.
  */
 int32_t json_number_to_int32(const char* num, size_t num_size);
 uint32_t json_number_to_uint32(const char* num, size_t num_size);
@@ -266,17 +266,21 @@ uint64_t json_number_to_uint64(const char* num, size_t num_size);
 int json_number_to_double(const char* num, size_t num_size, double* p_result);
 
 
-/* Helpers for writing numbers and strings.
- * (Given that all the rest is trivial, do it manually ;-)
+/* Helpers for writing numbers and strings in JSON-compatible format.
  *
- * Note that json_dump_string() assumes the string is well-formed UTF-8 string.
+ * Note that json_dump_string() assumes the string is a well-formed UTF-8
+ * string which needs no additional any UTF-8 validation. The function "only"
+ * handles proper escaping of control characters.
  *
- * The provided writing function must write all the data provided to it
- * and return zero to indicate success, or non-zero to indicate an error
- * and abort the operation.
+ * The provided writer callback must write all the data provided to it and
+ * return zero to indicate success, or non-zero to indicate an error and abort
+ * the operation.
  *
- * Returns zero on success, JSON_ERR_OUTOFMEMORY, or an error code returned
- * from writing callback.
+ * All these return zero on success, JSON_ERR_OUTOFMEMORY, or an error code
+ * propagated from the writer callback.
+ *
+ * (Given that all the other JSON stuff is trivial to output, app. is supposed
+ * to implement that manually.)
  */
 int json_dump_int32(int32_t i32, int (*write_func)(const char*, size_t, void*), void* user_data);
 int json_dump_uint32(uint32_t u32, int (*write_func)(const char*, size_t, void*), void* user_data);
