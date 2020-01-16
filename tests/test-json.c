@@ -1482,6 +1482,35 @@ test_issue2(void)
     value_fini(&root);
 }
 
+static void
+test_issue3(void)
+{
+    static const char expected[] = "[-1]";
+
+    VALUE root;
+    VALUE* minusone;
+    size_t n = 0;
+    int err;
+
+    value_init_array(&root);
+    minusone = value_array_append(&root);
+    value_init_int32(minusone, -1);
+
+    err = json_dom_dump(&root, test_dump_callback, (void*) &n, 0, 0);
+
+    if(TEST_CHECK(err == 0)) {
+        /* Parse it back and compare it with what we expect. */
+        VALUE a, b;
+        TEST_CHECK(json_dom_parse(dump_buffer, n, NULL, 0, &a, NULL) == 0);
+        TEST_CHECK(json_dom_parse(expected, strlen(expected), NULL, 0, &b, NULL) == 0);
+        deep_value_cmp(&a, &b);
+        value_fini(&a);
+        value_fini(&b);
+    }
+
+    value_fini(&root);
+}
+
 
 TEST_LIST = {
     { "pos-tracking",               test_pos_tracking },
@@ -1510,5 +1539,6 @@ TEST_LIST = {
     { "pointer",                    test_pointer },
     { "crazy-double",               test_crazy_double },
     { "bug-issue2",                 test_issue2 },
+    { "bug-issue3",                 test_issue3 },
     { 0 }
 };

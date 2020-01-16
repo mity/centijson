@@ -54,6 +54,9 @@ static const JSON_CONFIG json_defaults = {
 };
 
 
+#define ABS(x)          ((x) >= 0 ? (x) : -(x))
+
+
 void
 json_default_config(JSON_CONFIG* cfg)
 {
@@ -1172,7 +1175,7 @@ json_dump_int64(int64_t i64, int (*write_func)(const char*, size_t, void*), void
 
     if(i64 != 0) {
         while(i64 != 0) {
-            buffer[--off] = '0' + (i64 % 10);
+            buffer[--off] = '0' + ABS(i64 % 10);
             i64 /= 10;
         }
 
