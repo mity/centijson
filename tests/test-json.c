@@ -1453,6 +1453,35 @@ test_crazy_double(void)
     TEST_CHECK(value_double(&root) < 1.0001 * 2.2250738585072014e-308);
 }
 
+static void
+test_issue2(void)
+{
+    static const char expected[] = "[0]";
+
+    VALUE root;
+    VALUE* zero;
+    size_t n = 0;
+    int err;
+
+    value_init_array(&root);
+    zero = value_array_append(&root);
+    value_init_int32(zero, 0);
+
+    err = json_dom_dump(&root, test_dump_callback, (void*) &n, 0, 0);
+
+    if(TEST_CHECK(err == 0)) {
+        /* Parse it back and compare it with what we expect. */
+        VALUE a, b;
+        TEST_CHECK(json_dom_parse(dump_buffer, n, NULL, 0, &a, NULL) == 0);
+        TEST_CHECK(json_dom_parse(expected, strlen(expected), NULL, 0, &b, NULL) == 0);
+        deep_value_cmp(&a, &b);
+        value_fini(&a);
+        value_fini(&b);
+    }
+
+    value_fini(&root);
+}
+
 
 TEST_LIST = {
     { "pos-tracking",               test_pos_tracking },
@@ -1479,6 +1508,7 @@ TEST_LIST = {
     { "json-checker",               test_json_checker },
     { "dump",                       test_dump },
     { "pointer",                    test_pointer },
-    { "test-crazy-double",          test_crazy_double },
+    { "crazy-double",               test_crazy_double },
+    { "bug-issue2",                 test_issue2 },
     { 0 }
 };

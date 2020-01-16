@@ -1170,13 +1170,17 @@ json_dump_int64(int64_t i64, int (*write_func)(const char*, size_t, void*), void
     size_t off = sizeof(buffer);
     int is_neg = (i64 < 0);
 
-    while(i64 != 0) {
-        buffer[--off] = '0' + (i64 % 10);
-        i64 /= 10;
-    }
+    if(i64 != 0) {
+        while(i64 != 0) {
+            buffer[--off] = '0' + (i64 % 10);
+            i64 /= 10;
+        }
 
-    if(is_neg)
-        buffer[--off] = '-';
+        if(is_neg)
+            buffer[--off] = '-';
+    } else {
+        buffer[--off] = '0';
+    }
 
     return write_func(buffer + off, sizeof(buffer) - off, user_data);
 }
@@ -1187,9 +1191,13 @@ json_dump_uint64(uint64_t u64, int (*write_func)(const char*, size_t, void*), vo
     char buffer[32];
     size_t off = sizeof(buffer);
 
-    while(u64 != 0) {
-        buffer[--off] = '0' + (u64 % 10);
-        u64 /= 10;
+    if(u64 != 0) {
+        while(u64 != 0) {
+            buffer[--off] = '0' + (u64 % 10);
+            u64 /= 10;
+        }
+    } else {
+        buffer[--off] = '0';
     }
 
     return write_func(buffer + off, sizeof(buffer) - off, user_data);
