@@ -1209,7 +1209,7 @@ json_dump_uint64(uint64_t u64, int (*write_func)(const char*, size_t, void*), vo
 int
 json_dump_double(double d, int (*write_func)(const char*, size_t, void*), void* user_data)
 {
-    static const char fmt[] = "%lg";
+    static const char fmt[] = "%.16lg";
     static const size_t extra_bytes = 4;    /* Space reserved for ".0" */
     struct lconv* locale_info;
     int n;
@@ -1222,7 +1222,7 @@ json_dump_double(double d, int (*write_func)(const char*, size_t, void*), void* 
     /* First, try the small buffer on the stack. */
     n = snprintf(local_buffer, capacity, fmt, d);
     if(n >= capacity) {
-        /* We need larger buffer. So retry the request size. */
+        /* We need larger buffer. So retry with the requested size. */
         capacity = n + 1;
         buffer = (char*) malloc(capacity + extra_bytes);
         if(buffer == NULL)
@@ -1234,8 +1234,8 @@ json_dump_double(double d, int (*write_func)(const char*, size_t, void*), void* 
     }
 
     /* Old snprintf() implementations only report the buffer is too small and
-     * do not tell how much space is needed. So grow the buffer until it is
-     * large enough. */
+     * do not tell how much space is needed. So lets grow the buffer until it
+     * is large enough. */
     if(n < 0) {
         capacity = sizeof(local_buffer) * 2;
 
