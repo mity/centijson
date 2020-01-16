@@ -1154,7 +1154,7 @@ test_json_checker(void)
          * In Centijson, we allow by default any root, but caller may configure
          * this via flags of json_init().
          *
-         * We also test that quite throughly in test_err_bad_root_type().
+         * We also test that quite thoroughly in test_err_bad_root_type().
          */
         { "fail 1",  "\"A JSON payload should be an object or array, not a string.\"" },
 #endif
@@ -1175,8 +1175,9 @@ test_json_checker(void)
         { "fail 16", "[\\naked]" },
         { "fail 17", "[\"Illegal backslash escape: \\017\"]" },
 #if 0
-        Wrong. No JSON standard limits maximal nesting. And we allow caller to
-        limit it as he wishes.
+        /* This is plain wrong. No JSON standard limits maximal nesting. And we
+         * allow caller limit it as he wishes in json_init().
+         */
         { "fail 18", "[[[[[[[[[[[[[[[[[[[[\"Too deep\"]]]]]]]]]]]]]]]]]]]]" },
 #endif
         { "fail 19", "{\"Missing colon\" null}" },
