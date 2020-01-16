@@ -90,16 +90,30 @@ From http://json.org:
   * **High-level:** `json-dom.h` provides function `json_dom_dump()` which is
     capable to serialize whole DOM hierarchy.
 
-* **Performance:** The data storage provides great performance.
 
-  * Arrays offer `O(1)` to access its elements and `O(1)` to add them to
-    the end of the array. (Inserting or removing elements at the beginning or
-    in the middle of the array is only `O(N)` but, naturally, arrays are
-    populated from the beginning to the end during the JSON parsing.)
+## Performance
 
-  * Objects (or dictionaries, in terms of `value.h`) are implemented internally
-    as red-black trees and have `O(log N)` complexity for all the operations
-    like accessing, adding or removing their items.
+To be honest, we more focus on correctness and guranteeing reasonable parsing
+times for crazy input (the worst case) rather then a simple uncomplicated input
+so that we should be usable even for application reading the JSON from an
+untrusted sources.
+
+That for example means the objects in the DOM hierarchy are implemented as
+red-black trees so that we can provide reasonable member lookup times (`log(n)`)
+no matter how heavily populated they are.
+
+Of course, building the RB-trees takes some CPU time and this may show in some
+benchmarks, especially if they measure just the parsing and never perform
+lookup in heavily populated objects.
+
+Also the support for the parsing block by block, in the streaming fashion,
+means we cannot have as tight loops as parsers which take complete documents at
+once, leaving little bit less space for optimizing.
+
+But even so the preliminary tests we have done so far seem to indicate that we
+are quite competitive.
+
+(We will likely publish some real data on this in some foreseeable future.)
 
 
 ## Why Yet Another JSON Parser?
