@@ -46,10 +46,10 @@
 static const JSON_CONFIG json_defaults = {
     10 * 1024 * 1024,       /* max_total_len */
     0,                      /* max_total_values */
-    64,                     /* max_number_len */
+    512,                    /* max_number_len */
     65536,                  /* max_string_len */
-    256,                    /* max_key_len */
-    256,                    /* max_nesting_level */
+    512,                    /* max_key_len */
+    512,                    /* max_nesting_level */
     0                       /* flags */
 };
 
@@ -93,6 +93,7 @@ json_init(JSON_PARSER* parser, const JSON_CALLBACKS* callbacks,
 
     memcpy(&parser->callbacks, callbacks, sizeof(JSON_CALLBACKS));
     memcpy(&parser->config, config, sizeof(JSON_CONFIG));
+
     parser->user_data = user_data;
 
     parser->pos.line_number = FIRST_LINE_NUMBER;
@@ -472,12 +473,15 @@ json_string_automaton(JSON_PARSER* parser, const char* input, size_t size,
     if(type == JSON_KEY) {
         ignore_ill_utf8 = (parser->config.flags & JSON_IGNOREILLUTF8KEY);
         fix_ill_utf8 = (parser->config.flags & JSON_FIXILLUTF8KEY);
-        max_len = parser->config.max_key_len + 1;       /* +1 fir final quotes. */
+        max_len = parser->config.max_key_len;
     } else {
         ignore_ill_utf8 = (parser->config.flags & JSON_IGNOREILLUTF8VALUE);
         fix_ill_utf8 = (parser->config.flags & JSON_FIXILLUTF8VALUE);
-        max_len = parser->config.max_string_len + 1;    /* +1 fir final quotes. */
+        max_len = parser->config.max_string_len;
     }
+
+    if(max_len > 0)
+        max_len++;  /* +1 for the final quotes. */
 
     if(max_len != 0  &&  parser->pos.offset - parser->value_pos.offset + size > max_len)
         size = max_len - (parser->pos.offset - parser->value_pos.offset) + 1;

@@ -107,10 +107,10 @@ typedef enum JSON_TYPE {
 typedef struct JSON_CONFIG {
     size_t max_total_len;       /* zero means no limit; default: 10 MB */
     size_t max_total_values;    /* zero means no limit; default: 0 */
-    size_t max_number_len;      /* zero means no limit; default: 64 */
+    size_t max_number_len;      /* zero means no limit; default: 512 */
     size_t max_string_len;      /* zero means no limit; default: 65536 */
-    size_t max_key_len;         /* zero means no limit; default: 256 */
-    unsigned max_nesting_level; /* zero means no limit; default: 256 */
+    size_t max_key_len;         /* zero means no limit; default: 512 */
+    unsigned max_nesting_level; /* zero means no limit; default: 512 */
     unsigned flags;             /* default: 0 */
 } JSON_CONFIG;
 

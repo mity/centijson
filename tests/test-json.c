@@ -163,6 +163,20 @@ parse_(const char* input, size_t size, const JSON_CONFIG* config,
     int err2;
     JSON_INPUT_POS pos2;
 
+    /* Config to disable all limitations. */
+    static const JSON_CONFIG config_no_limit = {
+        0,  /* max_total_len */
+        0,  /* max_total_values */
+        0,  /* max_number_len */
+        0,  /* max_string_len */
+        0,  /* max_key_len */
+        0,  /* max_nesting_level */
+        0   /* flags */
+    };
+
+    if(config == NULL)
+        config = &config_no_limit;
+
     err1 = json_dom_parse(input, size, config, dom_flags, &root1, &pos1);
     err2 = parse_byte_by_byte(input, size, config, dom_flags, &root2, &pos2);
 
@@ -1400,6 +1414,46 @@ test_pointer(void)
 }
 
 
+static void
+test_crazy_double(void)
+{
+    /* These two are taken from https://github.com/miloyip/nativejson-benchmark
+     * tests (it has hit us.) */
+    char buffer[512];
+    int i, n;
+    VALUE root;
+    int err;
+
+    /* Very long number ('1' followed by 308 zeros). */
+    n = 0;
+    buffer[n++] = '1';
+    for(i = 0; i < 308; i++)
+        buffer[n++] = '0';
+    buffer[n++] = '\0';
+    err = parse(buffer, NULL, 0, &root, NULL);
+    TEST_CHECK(err == JSON_ERR_SUCCESS);
+    TEST_CHECK(value_type(&root) == VALUE_DOUBLE);
+    TEST_CHECK(value_double(&root) > 0.9999 * 1e308);
+    TEST_CHECK(value_double(&root) < 1.0001 * 1e308);
+
+    /* Trimming. */
+    err = parse(
+        "2.22507385850720113605740979670913197593481954635164564802342610972482222202107694551652952390813508"
+        "7914149158913039621106870086438694594645527657207407820621743379988141063267329253552286881372149012"
+        "9811224514518898490572223072852551331557550159143974763979834118019993239625482890171070818506906306"
+        "6665599493827577257201576306269066333264756530000924588831643303777979186961204949739037782970490505"
+        "1080609940730262937128958950003583799967207254304360284078895771796150945516748243471030702609144621"
+        "5722898802581825451803257070188608721131280795122334262883686223215037756666225039825343359745688844"
+        "2390026549819838548794829220689472168983109969836584681402285424333066033985088644580400103493397042"
+        "7567186443383770486037861622771738545623065874679014086723327636718751234567890123456789012345678901"
+        "e-308", NULL, 0, &root, NULL);
+    TEST_CHECK(err == JSON_ERR_SUCCESS);
+    TEST_CHECK(value_type(&root) == VALUE_DOUBLE);
+    TEST_CHECK(value_double(&root) > 0.9999 * 2.2250738585072014e-308);
+    TEST_CHECK(value_double(&root) < 1.0001 * 2.2250738585072014e-308);
+}
+
+
 TEST_LIST = {
     { "pos-tracking",               test_pos_tracking },
     { "null",                       test_null },
@@ -1425,5 +1479,6 @@ TEST_LIST = {
     { "json-checker",               test_json_checker },
     { "dump",                       test_dump },
     { "pointer",                    test_pointer },
+    { "test-crazy-double",          test_crazy_double },
     { 0 }
 };
