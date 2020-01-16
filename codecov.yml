@@ -1,0 +1,10 @@
+# YAML definition for codecov.io code coverage reports.
+
+ignore:
+    # These are tested in upstream, no need to duplicate the tests (and care
+    # about their coverage) here.
+    - "src/value.h"
+    - "src/value.c"
+
+    - "tests"
+
