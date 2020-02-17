@@ -24,7 +24,7 @@ From http://json.org:
 
 ## Main features:
 
-* **Size:** The code and memory footprint is quite small.
+* **Size:** The code size and memory footprint is relatively small.
 
 * **Standard compliance** High emphasis is put on correctness and compliance
   with the JSON standards [ECMA-404], [RFC-8259] and [RFC-6901]. That includes:
@@ -37,9 +37,9 @@ From http://json.org:
     All JSON escape sequences are automatically translated to their respective
     Unicode counterparts.
 
-* **Diagnostics:** In the case of invalid input, you get more then just some
-  failure flag, but full information about nature of the issue, and also an
-  information where in the document it has happened (offset as well as the
+* **Diagnostics:** In the case of an invalid input, you get more then just some
+  failure flag, but also an information about nature of the issue and about its
+  location in the document where it has been detected (offset as well as the
   line and column numbers are provided).
 
 * **Security:** CentiJSON is intended to be usable even in situations where
@@ -67,7 +67,7 @@ From http://json.org:
     build DOM structure which fits your special needs or process the data on
     the fly.
 
-  * **Full DOM parser:** `json-dom.h` + `json-dom.c` implements such DOM
+  * **Full DOM parser:** `json-dom.h` + `json-dom.c` implements such a DOM
     builder on top of the SAX-like parser which populates the data storage
     implemented in `value.h` + `value.c`.
 
@@ -79,8 +79,8 @@ From http://json.org:
   * **JSON pointer:** JSON pointer module, `json-ptr.h` + `json-ptr.c`, as
     specified by [RFC-6901].
 
-* **Streaming:** Ability to feed the parser with JSON input step by step, in
-  blocks of size the application chooses.
+* **Streaming:** Ability to feed the parser with JSON input block by block
+  (the blocks can be of an arbitrary size).
 
 * **Serialization:**
 
@@ -93,25 +93,25 @@ From http://json.org:
 
 ## Performance
 
-To be honest, we more focus on correctness and guranteeing reasonable parsing
-times for crazy input (the worst case) rather then a simple uncomplicated input
-so that we should be usable even for application reading the JSON from an
-untrusted sources.
+To be honest, we more focus on correctness and guaranteeing reasonable parsing
+times for crazy input (the worst case) rather then for a simple uncomplicated
+input. We should therefore be usable even for application reading the JSON from
+an untrusted sources.
 
-That for example means the objects in the DOM hierarchy are implemented as
-red-black trees so that we can provide reasonable member lookup times (`log(n)`)
-no matter how heavily populated they are.
+That for example means the objects in the DOM hierarchy are implemented as a
+red-black tree and we can provide reasonable member lookup times (`log(n)`) no
+matter how heavily populated the objects are.
 
 Of course, building the RB-trees takes some CPU time and this may show in some
-benchmarks, especially if they measure just the parsing and never perform
+benchmarks, especially if they measure just the parsing and never perform any
 lookup in heavily populated objects.
 
 Also the support for the parsing block by block, in the streaming fashion,
-means we cannot have as tight loops as parsers which take complete documents at
-once, leaving little bit less space for optimizing.
+means we cannot have as tight loops as some parsers which do not support this,
+and this gives as a smaller space for some optimizations.
 
-But even so the preliminary tests we have done so far seem to indicate that we
-are quite competitive.
+But even so, some preliminary tests we have done so far seem to indicate that
+we are quite competitive.
 
 (We will likely publish some real data on this in some foreseeable future.)
 
@@ -121,9 +121,9 @@ are quite competitive.
 Indeed, there are already hundreds (if not thousands) JSON parsers written in
 C out there. But as far as I know, they mostly fall into one of two categories.
 
-In the 1st category, they are very small and simple (and quite often they also
-take pride in it). But then they usually have one or more shortcomings from
-this list:
+The parsers in the 1st category are very small and simple (and quite often they
+also take pride in it). They then usually have one or more shortcomings from
+the following list:
 
 * They usually expect full in-memory document to parse and do not allow parsing
   block by block;
@@ -147,10 +147,11 @@ this list:
   full escape sequence resolution, or fall into troubles if any string contains
   U+0000 (`"foo\u0000bar"`).
 
-In the 2nd category, they are far less numerous, but very huge beasts which
-provide many scores of functions, which provide very complicated data
-abstraction layers and baroque interfaces, and they are simply too big and
-complicated for my taste or needs or will to incorporate them in my projects.
+The parsers in the 2nd category are far less numerous. They are usually very
+huge beasts which provide many scores of functions, which provide very
+complicated data abstraction layers and/or baroque interfaces, and they are
+simply too big and complicated for my taste or needs or will to incorporate
+them in my projects.
 
 CentiJSON aims to reside somewhere in the no man's land, between the two
 categories.
@@ -183,7 +184,7 @@ If you want to use just the SAX-like parser, follow these steps:
    Or alternatively, if you have whole input in a single buffer, you may use
    `json_parse()` which wraps the three functions.
 
-Note that CentiJSON fully verifies correctness the input. But it is done on
+Note that CentiJSON fully verifies correctness of the input. But it is done on
 the fly. Hence, if you feed the parser with broken JSON file, your callback
 function can see e.g. a beginning of an array but not its end, if in the mean
 time the parser aborts due to an error.
@@ -270,15 +271,15 @@ in `value.h`:
 
 **Q: How does CentiJSON deal with numbers?**
 
-**A:** It's true that the untyped notion of number, as JSON specifies it, is
-little bit complicated for languages like C.
+**A:** It's true that the untyped notion of the number type, as specified by
+JSON standards, is a little bit complicated to deal with for languages like C.
 
 On the SAX-like parser level, the syntax of numbers is verified accordingly
-to the JSON standards and provided to the callback as verbatim string.
+to the JSON standards and provided to the callback as a verbatim string.
 
-The provided DOM builder (`json-dom.h`) tries to guess most appropriate C type
-how to store the number to mitigate any data loss by the following heuristics
-(in this order; the 1st suitable rule is used.):
+The provided DOM builder (`json-dom.h`) tries to guess the most appropriate C
+type how to store the number to mitigate any data loss by applying the rules
+(the first applicable rule is used):
 1. If there is no fraction and no exponent part and the integer fits into
    `VALUE_INT32`, then it shall be `VALUE_INT32`.
 2. If there is no minus sign, no fraction or exponent part and the integer fits
