@@ -248,7 +248,7 @@ json_buf_append(JSON_PARSER* parser, const char* data, size_t size)
         char* new_buf;
         size_t new_alloced = (parser->buf_used + size) * 2;
 
-        new_buf = realloc(parser->buf, new_alloced);
+        new_buf = (char *) realloc(parser->buf, new_alloced);
         if(new_buf == NULL) {
             json_raise(parser, JSON_ERR_OUTOFMEMORY);
             return -1;
@@ -448,7 +448,7 @@ json_resolve_xdigit(char ch)
  * U+fffd. The two trailing bytes, who cannot really follow in well-formed
  * UTF-8, then are replaced with U+fffd each too.)
  */
-static const char fffd[9] = { 0xef, 0xbf, 0xbd, 0xef, 0xbf, 0xbd, 0xef, 0xbf, 0xbd };
+static const char fffd[9] = { '\xef', '\xbf', '\xbd', '\xef', '\xbf', '\xbd', '\xef', '\xbf', '\xbd' };
 static const size_t fffd_size = 3;
 
 static int
@@ -1246,7 +1246,7 @@ json_dump_double(double d, int (*write_func)(const char*, size_t, void*), void* 
         while(1) {
             char* new_buffer;
 
-            new_buffer = realloc(buffer, capacity + extra_bytes);
+            new_buffer = (char *) realloc(buffer, capacity + extra_bytes);
             if(new_buffer == NULL) {
                 free(buffer);
                 return JSON_ERR_OUTOFMEMORY;
@@ -1335,7 +1335,7 @@ json_dump_string(const char* str, size_t size, int (*write_func)(const char*, si
 
         if(IS_CONTROL(ch)  ||  ch == '\"'  ||  ch == '\\') {
             char esc_buffer[8];
-            char* esc;
+            const char* esc;
             size_t esc_size;
 
             switch(ch) {
