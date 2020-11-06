@@ -232,6 +232,11 @@ int json_parse(const char* input, size_t size,
                void* user_data, JSON_INPUT_POS* p_pos);
 
 
+/* Converts error code to human readable error message
+ */
+const char* json_error_str(int err_code);
+
+
 /*****************
  *** Utilities ***
  *****************/

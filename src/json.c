@@ -1380,3 +1380,39 @@ json_dump_string(const char* str, size_t size, int (*write_func)(const char*, si
 
     return 0;
 }
+
+const char* json_error_str(int err_code)
+{
+    static const char unexpected_code[] = "Unexpected error code";
+    static const char *const errs[] =
+    {
+        "Success", /* JSON_ERR_SUCCESS 0 */
+        "Internal error", /* JSON_ERR_INTERNAL (-1) */
+        "Out of memory", /* JSON_ERR_OUTOFMEMORY (-2) */
+        unexpected_code,
+        "Syntax error", /* JSON_ERR_SYNTAX (-4) */
+        "Mismatch in brackets", /* JSON_ERR_BADCLOSER (-5) */
+        "Root type not allowed by settings", /* JSON_ERR_BADROOTTYPE (-6) */
+        "Expected value", /* JSON_ERR_EXPECTEDVALUE (-7) */
+        "Expected key", /* JSON_ERR_EXPECTEDKEY (-8) */
+        "Expected value or closer", /* JSON_ERR_EXPECTEDVALUEORCLOSER (-9) */
+        "Expected key or closer", /* JSON_ERR_EXPECTEDKEYORCLOSER (-10) */
+        "Expected colon", /* JSON_ERR_EXPECTEDCOLON (-11) */
+        "Expected comma or closer",  /* JSON_ERR_EXPECTEDCOMMAORCLOSER (-12) */
+        "Expected EOF", /* JSON_ERR_EXPECTEDEOF (-13) */
+        "Exceeded max document length", /* JSON_ERR_MAXTOTALLEN (-14) */
+        "Exceeded max total values", /* JSON_ERR_MAXTOTALVALUES (-15) */
+        "Exceeded max nesting level", /* JSON_ERR_MAXNESTINGLEVEL (-16) */
+        "Exceeded max number length", /* JSON_ERR_MAXNUMBERLEN (-17) */
+        "Exceeded max string length", /* JSON_ERR_MAXSTRINGLEN (-18) */
+        "Exceeded max key length", /* JSON_ERR_MAXKEYLEN (-19) */
+        "Unclosed string", /* JSON_ERR_UNCLOSEDSTRING (-20) */
+        "Unescaped control character", /* JSON_ERR_UNESCAPEDCONTROL (-21) */
+        "Invalid escape sequence", /* JSON_ERR_INVALIDESCAPE (-22) */
+        "Invalid UTF-8" /* JSON_ERR_INVALIDUTF8 (-23) */
+    };
+    const int array_size = sizeof errs / sizeof errs[0];
+    if(-array_size < err_code && err_code <= 0)
+        return errs[-err_code];
+    return unexpected_code;
+}
