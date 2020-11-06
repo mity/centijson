@@ -58,8 +58,8 @@ From http://json.org:
     attacks.
 
 * **Modularity:** Do you need just SAX-like parser? Take just that. Do you
-  need full DOM parser and representation? Take it all, it's still just three
-  reasonably-sized C files (and three headers).
+  need full DOM parser and AST representation? Take it all, it's still just
+  few reasonably-sized C files (and corresponding headers).
 
   * **SAX-like parser:** Take just `json.h` + `json.c` and you have complete
     SAX-like parser. It's smart enough to verify JSON correctness, validate
@@ -76,8 +76,9 @@ From http://json.org:
     it is not bound to the JSON parser implementation in any way, so you can
     reuse it for other purposes.
 
-  * **JSON pointer:** JSON pointer module, `json-ptr.h` + `json-ptr.c`, as
-    specified by [RFC-6901].
+  * **JSON pointer:** JSON pointer module, `json-ptr.h` + `json-ptr.c`, which
+    allows to query the data storage (`value.h` + `value.c`) as specified by
+    [RFC-6901].
 
 * **Streaming:** Ability to feed the parser with JSON input block by block
   (the blocks can be of an arbitrary size).
@@ -94,7 +95,7 @@ From http://json.org:
 ## Performance
 
 To be honest, we more focus on correctness and guaranteeing reasonable parsing
-times for crazy input (the worst case) rather then for a simple uncomplicated
+times for crazy input (the worst case) rather than for a simple uncomplicated
 input. We should therefore be usable even for application reading the JSON from
 an untrusted sources.
 
