@@ -1212,7 +1212,7 @@ json_dump_double(double dbl, JSON_DUMP_CALLBACK write_func, void* user_data)
     static const size_t extra_bytes = 2;    /* Space reserved for ".0" */
     struct lconv* locale_info;
     int n;
-    char local_buffer[64 + extra_bytes];
+    char local_buffer[64];
     size_t capacity = sizeof(local_buffer) - extra_bytes;
     char* buffer = local_buffer;
     char* new_buffer;
