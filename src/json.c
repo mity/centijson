@@ -409,13 +409,10 @@ json_number_automaton(JSON_PARSER* parser, const char* input, size_t size)
         json_raise_for_value(parser, JSON_ERR_MAXNUMBERLEN);
 
     if(input == NULL) {       /* EOF */
-        if(parser->errcode == 0  &&  parser->substate & can_see_end) {
-            if(json_buf_append(parser, input, off) != 0)
-                return 0;
+        if(parser->errcode == 0  &&  (parser->substate & can_see_end))
             json_process(parser, JSON_NUMBER, parser->buf, parser->buf_used);
-        } else {
+        else
             json_raise_for_value(parser, JSON_ERR_SYNTAX);
-        }
     } else {
         if(parser->errcode == 0) {
             if(json_buf_append(parser, input, off) != 0)
@@ -1107,7 +1104,8 @@ json_number_to_double(const char* num, size_t num_size, double* p_result)
      * However strtod() has (for us) two strong disadvantages we have to deal
      * with.
      *
-     * (1) It expects the string terminated by '\0' which we do not have here.
+     * (1) It expects the string is terminated by '\0' which we do not have
+     *     here.
      *
      * (2) Instead of decimal period '.', it may expect other character as
      *     specified by the current locale.
@@ -1117,10 +1115,11 @@ json_number_to_double(const char* num, size_t num_size, double* p_result)
      *     of process. Some platforms even have some hybrid solution.
      *
      *     This means, we (as a library) cannot afford changing the locale to
-     *     "C", even temporarily.
+     *     "C", even temporarily, as we could easily break multi-threaded
+     *     applications.
      *
-     * So instead we have to create new string in a temp. buffer following
-     * those requirements.
+     * Instead, we create the new string in a temp. buffer following those
+     * requirements.
      */
 
     if(num_size + 1 < sizeof(local_buffer)) {
@@ -1155,19 +1154,19 @@ json_number_to_double(const char* num, size_t num_size, double* p_result)
 
 
 int
-json_dump_int32(int32_t i32, int (*write_func)(const char*, size_t, void*), void* user_data)
+json_dump_int32(int32_t i32, JSON_DUMP_CALLBACK write_func, void* user_data)
 {
     return json_dump_int64(i32, write_func, user_data);
 }
 
 int
-json_dump_uint32(uint32_t u32, int (*write_func)(const char*, size_t, void*), void* user_data)
+json_dump_uint32(uint32_t u32, JSON_DUMP_CALLBACK write_func, void* user_data)
 {
     return json_dump_uint64(u32, write_func, user_data);
 }
 
 int
-json_dump_int64(int64_t i64, int (*write_func)(const char*, size_t, void*), void* user_data)
+json_dump_int64(int64_t i64, JSON_DUMP_CALLBACK write_func, void* user_data)
 {
     char buffer[32];
     size_t off = sizeof(buffer);
@@ -1189,7 +1188,7 @@ json_dump_int64(int64_t i64, int (*write_func)(const char*, size_t, void*), void
 }
 
 int
-json_dump_uint64(uint64_t u64, int (*write_func)(const char*, size_t, void*), void* user_data)
+json_dump_uint64(uint64_t u64, JSON_DUMP_CALLBACK write_func, void* user_data)
 {
     char buffer[32];
     size_t off = sizeof(buffer);
@@ -1207,65 +1206,50 @@ json_dump_uint64(uint64_t u64, int (*write_func)(const char*, size_t, void*), vo
 }
 
 int
-json_dump_double(double d, int (*write_func)(const char*, size_t, void*), void* user_data)
+json_dump_double(double dbl, JSON_DUMP_CALLBACK write_func, void* user_data)
 {
     static const char fmt[] = "%.16lg";
-    static const size_t extra_bytes = 4;    /* Space reserved for ".0" */
+    static const size_t extra_bytes = 2;    /* Space reserved for ".0" */
     struct lconv* locale_info;
     int n;
-    char local_buffer[64];
+    char local_buffer[64 + extra_bytes];
     size_t capacity = sizeof(local_buffer) - extra_bytes;
     char* buffer = local_buffer;
+    char* new_buffer;
     char* fp;
     int ret;
 
-    /* First, try the small buffer on the stack. */
-    n = snprintf(local_buffer, capacity, fmt, d);
-    if(n >= capacity) {
-        /* We need larger buffer. So retry with the requested size. */
-        capacity = n + 1;
-        buffer = (char*) malloc(capacity + extra_bytes);
-        if(buffer == NULL)
-            return JSON_ERR_OUTOFMEMORY;
+    while(1) {
+        n = snprintf(buffer, capacity, fmt, dbl);
+        if(n >= 0  &&  n < capacity)
+            break;
 
-        n = snprintf(buffer, capacity, fmt, d);
+        /* If the buffer is insufficient, old snprintf() implementations
+         * only report the buffer is too small and don't tell how large
+         * the buffer has to be. So lets grow the buffer until it is large
+         * enough. */
         if(n >= capacity)
-            n = -1;
-    }
-
-    /* Old snprintf() implementations only report the buffer is too small and
-     * do not tell how much space is needed. So lets grow the buffer until it
-     * is large enough. */
-    if(n < 0) {
-        capacity = sizeof(local_buffer) * 2;
+            capacity = n + 1;
+        else
+            capacity = capacity * 2;
 
         /* Make the terrain safe for realloc(). */
         if(buffer == local_buffer)
             buffer = NULL;
 
-        while(1) {
-            char* new_buffer;
-
-            new_buffer = (char *) realloc(buffer, capacity + extra_bytes);
-            if(new_buffer == NULL) {
-                free(buffer);
-                return JSON_ERR_OUTOFMEMORY;
-            }
-            buffer = new_buffer;
-
-            n = snprintf(buffer, capacity, fmt, d);
-            if(n >= 0  &&  n < capacity)
-                break;
-
-            capacity *= 2;
+        new_buffer = (char *) realloc(buffer, capacity + extra_bytes);
+        if(new_buffer == NULL) {
+            free(buffer);
+            return JSON_ERR_OUTOFMEMORY;
         }
+        buffer = new_buffer;
     }
 
-    /* Similar pain as above for strtod(). We need to fight with snprintf()
-     * and undo the locale-dependent stuff. */
+    /* Similar pain as above for strtod(). We need to fight with snprintf() and
+     * undo the locale-dependent stuff. */
     locale_info = localeconv();
 
-    /* If defined by the current locale, remove any thousands separators. */
+    /* Remove all potential locale-provided thousand separators. */
     if(locale_info->thousands_sep != NULL  &&  locale_info->thousands_sep[0]) {
         char* sep = locale_info->thousands_sep;
         size_t sep_len = strlen(sep);
@@ -1281,22 +1265,23 @@ json_dump_double(double d, int (*write_func)(const char*, size_t, void*), void* 
         }
     }
 
-    /* Fix floating point. */
+    /* Replace the locale-provided decimal point with '.'. */
     fp = strchr(buffer, locale_info->decimal_point[0]);
     if(fp != NULL) {
         *fp = '.';
-    } else if(strchr(buffer, 'e') == 0) {
-        /* There is no decimal point. And there is also no 'e' (i.e. no
-         * scientific notation), i.e. it looks too much as an integer.
+    } else if(strchr(buffer, 'e') == NULL) {
+        /* There is no decimal point present and also no 'e', i.e. it's not
+         * in the scientific notation, i.e. it looks too much as an integer
+         * if we ever re-read the value back.
          *
          * For the sake of consistency, let's make sure that, if we ever
          * re-read the string again, we shall map it to double again, by
          * appending the decimal point.
          *
-         * We may do this safely: We reserved few bytes in malloc()/realloc()
-         * above for this.
+         * We may do this safely: We reserved few bytes in the buffer exactly
+         * for this purpose.
          */
-        memcpy(buffer + n, ".0", 3);
+        memcpy(buffer + n, ".0", 2);
         n += 2;
     }
 
@@ -1321,7 +1306,7 @@ json_control_to_hex(char* buf, uint8_t ch)
 }
 
 int
-json_dump_string(const char* str, size_t size, int (*write_func)(const char*, size_t, void*), void* user_data)
+json_dump_string(const char* str, size_t size, JSON_DUMP_CALLBACK write_func, void* user_data)
 {
     size_t off = 0;
     int ret;

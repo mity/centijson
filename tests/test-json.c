@@ -1140,13 +1140,25 @@ test_json_checker(void)
         "1e00,2e+00,2e-00\n"
         ",\"rosebud\"]";
 
-    static const char pass3[] = {
+    static const char pass2[] =
+        "[[[[[[[[[[[[[[[[[[[\"Not too deep\"]]]]]]]]]]]]]]]]]]]";
+
+    static const char pass3[] =
         "{\n"
         "    \"JSON Test Pattern pass3\": {\n"
         "        \"The outermost value\": \"must be an object or array.\",\n"
         "        \"In this test\": \"It is an object.\"\n"
         "    }\n"
-        "}\n"
+        "}\n";
+
+    static const struct {
+        const char* name;
+        const char* input;
+    } pass[] = {
+        { "pass 1", pass1 },
+        { "pass 2", pass2 },
+        { "pass 3", pass3 },
+        { 0 }
     };
 
     static const struct {
@@ -1212,26 +1224,16 @@ test_json_checker(void)
         { 0 }
     };
 
-    static const struct {
-        const char* name;
-        const char* input;
-    } pass[] = {
-        { "pass 1", pass1 },
-        { "pass 2", "[[[[[[[[[[[[[[[[[[[\"Not too deep\"]]]]]]]]]]]]]]]]]]]" },
-        { "pass 3", pass3 },
-        { 0 }
-    };
-
     int i;
-
-    for(i = 0; fail[i].name != NULL; i++) {
-        TEST_CASE(fail[i].name);
-        TEST_CHECK(parse(fail[i].input, NULL, 0, NULL, NULL) != 0);
-    }
 
     for(i = 0; pass[i].name != NULL; i++) {
         TEST_CASE(pass[i].name);
         TEST_CHECK(parse(pass[i].input, NULL, 0, NULL, NULL) == 0);
+    }
+
+    for(i = 0; fail[i].name != NULL; i++) {
+        TEST_CASE(fail[i].name);
+        TEST_CHECK(parse(fail[i].input, NULL, 0, NULL, NULL) != 0);
     }
 }
 

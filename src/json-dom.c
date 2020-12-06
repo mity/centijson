@@ -211,7 +211,7 @@ json_dom_parse(const char* input, size_t size, const JSON_CONFIG* config,
 }
 
 typedef struct JSON_DOM_DUMP_PARAMS {
-    int (*write_func)(const char*, size_t, void*);
+    JSON_DUMP_CALLBACK write_func;
     void* user_data;
     unsigned tab_width;
     unsigned flags;
@@ -391,10 +391,10 @@ json_dom_dump_helper(const VALUE* node, int nest_level,
                     ret = json_dom_dump_helper(keys[i], nest_level+1, params);
                     if(ret != 0)
                         break;
-                    if(params->flags & JSON_DOM_DUMP_MINIMIZE)
-                        ret = params->write_func(":", 1, params->user_data);
-                    else
-                        ret = params->write_func(": ", 2, params->user_data);
+
+                    ret = params->write_func(": ",
+                            (params->flags & JSON_DOM_DUMP_MINIMIZE) ? 1 : 2,
+                            params->user_data);
                     if(ret != 0)
                         break;
 
@@ -432,7 +432,7 @@ json_dom_dump_helper(const VALUE* node, int nest_level,
 }
 
 int
-json_dom_dump(const VALUE* root, int (*write_func)(const char*, size_t, void*),
+json_dom_dump(const VALUE* root, JSON_DUMP_CALLBACK write_func,
               void* user_data, unsigned tab_width, unsigned flags)
 {
     JSON_DOM_DUMP_PARAMS params = { write_func, user_data, tab_width, flags };

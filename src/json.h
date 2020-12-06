@@ -130,7 +130,7 @@ typedef struct JSON_INPUT_POS {
 /* Callbacks the application has to implement, to process the parsed data.
  */
 typedef struct JSON_CALLBACKS {
-    /* Data processing callback. For now, and maybe forever, the only callback.
+    /* Data processing callback. For now (and maybe forever) the only callback.
      *
      * Note that `data` and `data_size` are set only for JSON_KEY, JSON_STRING
      * and JSON_NUMBER. (For the other types the callback always gets NULL and
@@ -140,7 +140,7 @@ typedef struct JSON_CALLBACKS {
      * corresponding values in the alternating fashion (i.e. in the order
      * as they are in the JSON input.).
      *
-     * Application can abort complete parsing operation by returning non-zero.
+     * Application can abort the parsing operation by returning a non-zero.
      * Note the non-zero return value of the callback is propagated to
      * json_feed() and json_fini().
      */
@@ -183,13 +183,15 @@ typedef struct JSON_PARSER {
 
 
 
-/* Fill `cfg` with options used by default.
+/* Fill `config` with options used by default.
  */
-void json_default_config(JSON_CONFIG* cfg);
+void json_default_config(JSON_CONFIG* config);
 
 
 /* Initialize the parser, associate it with the given callbacks and
  * configuration. Returns zero on success, non-zero on an error.
+ *
+ * If `config` is NULL, default values are used.
  */
 int json_init(JSON_PARSER* parser,
               const JSON_CALLBACKS* callbacks,
@@ -200,26 +202,26 @@ int json_init(JSON_PARSER* parser,
  *
  * Returns zero on success.
  *
- * If an error occurs it returns non-zero, and the application should just call
- * json_fini(); any trying to call json_feed() again shall just fail with
- * the same return value.
+ * If an error occurs it returns non-zero and any attempt to call json_feed()
+ * again shall just fail with the same error code. Note the application should
+ * still  call json_fini() to release all resources allocated by the parser.
  */
 int json_feed(JSON_PARSER* parser, const char* input, size_t size);
 
 /* Finish parsing of the document (note it can still call some callbacks); and
- * release any resource held by the parser.
+ * release any resources held by the parser.
  *
  * Returns zero on success, or non-zero on failure.
  *
- * If p_pos is not NULL, it is filled with info about reached position in the
+ * If `p_pos` is not NULL, it is filled with info about reached position in the
  * input. It can help in diagnostics if the parsing failed.
  *
  * Note that if the preceding call to json_feed() failed, the error status also
  * propagates into json_fini().
  *
- * Also note this function may still fail even if all preceding calls to
- * json_feed() succeeded. This typically happens if the processed JSON input
- * was an incomplete JSON document.
+ * Also note this function may still fail even when all preceding calls to
+ * json_feed() succeeded. This typically happens when the parser was fed with
+ * an incomplete JSON document.
  */
 int json_fini(JSON_PARSER* parser, JSON_INPUT_POS* p_pos);
 
@@ -243,7 +245,8 @@ int json_parse(const char* input, size_t size,
 /* Analyze the string holding a JSON number, and analyze whether it can
  * fit into integer types.
  *
- * (Note it says no, if the number contains any fraction or exponent part.)
+ * (Note it says "no" in cases the number string contains any fraction or
+ * exponent part.)
  */
 void json_analyze_number(const char* num, size_t num_size,
                          int* p_is_int32_compatible,
@@ -254,9 +257,9 @@ void json_analyze_number(const char* num, size_t num_size,
 /* Convert the string holding JSON number to the given C type.
  *
  * Note the conversion to any of the integer types is undefined unless
- * json_analyze_number() says it is fine.
+ * json_analyze_number() says it's fine.
  *
- * And also note that json_number_to_double() can fail with JSON_ERR_OUTOFMEMORY.
+ * Also note that json_number_to_double() can fail with JSON_ERR_OUTOFMEMORY.
  * Hence its prototype differs.
  */
 int32_t json_number_to_int32(const char* num, size_t num_size);
@@ -266,10 +269,12 @@ uint64_t json_number_to_uint64(const char* num, size_t num_size);
 int json_number_to_double(const char* num, size_t num_size, double* p_result);
 
 
+typedef int (*JSON_DUMP_CALLBACK)(const char* /*str*/, size_t /*size*/, void* /*user_data*/);
+
 /* Helpers for writing numbers and strings in JSON-compatible format.
  *
  * Note that json_dump_string() assumes the string is a well-formed UTF-8
- * string which needs no additional any UTF-8 validation. The function "only"
+ * string which needs no additional Unicode validation. The function "only"
  * handles proper escaping of control characters.
  *
  * The provided writer callback must write all the data provided to it and
@@ -279,15 +284,15 @@ int json_number_to_double(const char* num, size_t num_size, double* p_result);
  * All these return zero on success, JSON_ERR_OUTOFMEMORY, or an error code
  * propagated from the writer callback.
  *
- * (Given that all the other JSON stuff is trivial to output, app. is supposed
- * to implement that manually.)
+ * (Given that all the other JSON stuff is trivial to output, the application
+ * is supposed to implement that manually.)
  */
-int json_dump_int32(int32_t i32, int (*write_func)(const char*, size_t, void*), void* user_data);
-int json_dump_uint32(uint32_t u32, int (*write_func)(const char*, size_t, void*), void* user_data);
-int json_dump_int64(int64_t i64, int (*write_func)(const char*, size_t, void*), void* user_data);
-int json_dump_uint64(uint64_t u64, int (*write_func)(const char*, size_t, void*), void* user_data);
-int json_dump_double(double d, int (*write_func)(const char*, size_t, void*), void* user_data);
-int json_dump_string(const char* str, size_t size, int (*write_func)(const char*, size_t, void*), void* user_data);
+int json_dump_int32(int32_t i32, JSON_DUMP_CALLBACK write_func, void* user_data);
+int json_dump_uint32(uint32_t u32, JSON_DUMP_CALLBACK write_func, void* user_data);
+int json_dump_int64(int64_t i64, JSON_DUMP_CALLBACK write_func, void* user_data);
+int json_dump_uint64(uint64_t u64, JSON_DUMP_CALLBACK write_func, void* user_data);
+int json_dump_double(double dbl, JSON_DUMP_CALLBACK write_func, void* user_data);
+int json_dump_string(const char* str, size_t size, JSON_DUMP_CALLBACK write_func, void* user_data);
 
 
 #ifdef __cplusplus

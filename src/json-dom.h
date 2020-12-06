@@ -108,16 +108,16 @@ int json_dom_parse(const char* input, size_t size, const JSON_CONFIG* config,
  * and return zero to indicate success, or non-zero to indicate an error
  * and abort the operation.
  *
- * Returns zero on success, JSON_ERR_OUTOFMEMORY, or an error code returned
+ * Returns zero on success, JSON_ERR_OUTOFMEMORY, or an error the code returned
  * from writing callback.
  */
 #define JSON_DOM_DUMP_MINIMIZE          0x0001  /* Do not indent, do not use no extra whitespace including new lines. */
 #define JSON_DOM_DUMP_FORCECLRF         0x0002  /* Use "\r\n" instead of just "\n". */
 #define JSON_DOM_DUMP_INDENTWITHSPACES  0x0004  /* Indent with `tab_width` spaces instead of with '\t'. */
-#define JSON_DOM_DUMP_PREFERDICTORDER   0x0008  /* Prefer original dictionary order, if possible. */
+#define JSON_DOM_DUMP_PREFERDICTORDER   0x0008  /* Prefer original dictionary order, if available. */
 
 int json_dom_dump(const VALUE* root,
-                  int (*write_func)(const char*, size_t, void*), void* user_data,
+                  JSON_DUMP_CALLBACK write_func, void* user_data,
                   unsigned tab_width, unsigned flags);
 
 
