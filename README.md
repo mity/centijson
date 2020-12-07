@@ -37,7 +37,7 @@ From http://json.org:
     All JSON escape sequences are automatically translated to their respective
     Unicode counterparts.
 
-* **Diagnostics:** In the case of an invalid input, you get more then just some
+* **Diagnostics:** In the case of an invalid input, you get more than just some
   failure flag, but also an information about nature of the issue and about its
   location in the document where it has been detected (offset as well as the
   line and column numbers are provided).
@@ -138,21 +138,19 @@ the following list:
 
   (That may be good enough if you really **know** that all the input will be
   always small. But allow any black hat feed it with some bigger beast and you
-  have Denial of Service faster then you spell it.)
+  have Denial of Service faster than you can spell it.)
 
-* Those really small ones usually often lack possibility of modifying the tree
-  of the data, like adding new items into arrays or dictionaries, or removing
-  them from there.
+* They often lack any possibility of modifying the tree of the data, like e.g.
+  adding a new item into an array or an object, or removing an item from there.
 
 * They often perform minimal or no UTF-8 encoding validation, do not perform
   full escape sequence resolution, or fall into troubles if any string contains
   U+0000 (`"foo\u0000bar"`).
 
 The parsers in the 2nd category are far less numerous. They are usually very
-huge beasts which provide many scores of functions, which provide very
-complicated data abstraction layers and/or baroque interfaces, and they are
-simply too big and complicated for my taste or needs or will to incorporate
-them in my projects.
+huge beasts which provide many scores of functions, complicated abstraction
+layers and/or baroque interfaces, and they are simply too big and complicated
+for my taste or needs or will to incorporate them in my projects.
 
 CentiJSON aims to reside somewhere in the no man's land, between the two
 categories.
@@ -327,7 +325,7 @@ no sense, given the nature of JSON format.)
 **Q: CentiJSON? Why such a horrible name?**
 
 **A:** First, because I am poor in naming things. Second, because CentiJSON is
-bigger then all those picojsons, nanojsons or microjsons; yet it's still quite
+bigger than all those picojsons, nanojsons or microjsons; yet it's still quite
 small, as the prefix suggests. Third, because it begins with the letter 'C',
 and that refers to the C language. Forth, because the name reminds centipedes
 and centipedes belong to Arthropods. The characteristic feature of this group
