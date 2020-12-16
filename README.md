@@ -109,7 +109,7 @@ lookup in heavily populated objects.
 
 Also the support for the parsing block by block, in the streaming fashion,
 means we cannot have as tight loops as some parsers which do not support this,
-and this gives as a smaller space for some optimizations.
+and this gives us a smaller space for some optimizations.
 
 But even so, some preliminary tests we have done so far seem to indicate that
 we are quite competitive.
@@ -160,8 +160,8 @@ categories.
 
 ### SAX-like Parser
 
-(Disclaimer: If you don't know what SAX-like Parser means, you likely want
-to see the section below about the DOM Parser and ignore this section.)
+(Disclaimer: If you don't know what "SAX-like parser" means, you likely want
+to see the section below about the DOM parser and ignore this section.)
 
 If you want to use just the SAX-like parser, follow these steps:
 
