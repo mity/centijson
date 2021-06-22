@@ -1221,17 +1221,17 @@ json_dump_double(double dbl, JSON_DUMP_CALLBACK write_func, void* user_data)
 
     while(1) {
         n = snprintf(buffer, capacity, fmt, dbl);
-        if(n >= 0  &&  n < capacity)
+        if(n >= 0  &&  (size_t)n < capacity)
             break;
 
         /* If the buffer is insufficient, old snprintf() implementations
          * only report the buffer is too small and don't tell how large
          * the buffer has to be. So lets grow the buffer until it is large
          * enough. */
-        if(n >= capacity)
-            capacity = n + 1;
+        if(n < 0)
+            capacity *= 2;
         else
-            capacity = capacity * 2;
+            capacity = n + 1;
 
         /* Make the terrain safe for realloc(). */
         if(buffer == local_buffer)
