@@ -26,6 +26,7 @@
 #include "json.h"
 
 #include <locale.h>     /* localeconv() */
+#include <malloc.h>
 #include <stdio.h>      /* snprintf() */
 #include <stdlib.h>
 #include <string.h>
@@ -1088,11 +1089,48 @@ json_number_to_uint64(const char* num, size_t num_size)
     return val;
 }
 
+
+#define MALLOCA_THRESHOLD         256
+
+#ifdef _WIN32
+    #ifndef alloca
+        #define alloca  _alloca
+    #endif
+#endif
+
+static void*
+malloca_set_mark(void* ptr, int mark)
+{
+    if(ptr != NULL) {
+        int* x = (int*)ptr;
+        *x = mark;
+        ptr = (void*)((char*)ptr + sizeof(void*));
+    }
+    return ptr;
+}
+
+#define MALLOCA_(size, threshold)                                           \
+    ((size) < (threshold) - sizeof(void*)                                   \
+        ? malloca_set_mark(alloca(size + sizeof(void*)), 0xcccc)            \
+        : malloca_set_mark(malloc(size + sizeof(void*)), 0xdddd))
+
+#define MALLOCA(size)       MALLOCA_((size), MALLOCA_THRESHOLD)
+
+#define FREEA(ptr)                                                          \
+    do {                                                                    \
+        if((ptr) != NULL) {                                                 \
+            int* x = (int*)((char*)(ptr) - sizeof(void*));                  \
+            if(*x == 0xdddd)                                                \
+                free(x);                                                    \
+        }                                                                   \
+    } while(0)
+
 int
 json_number_to_double(const char* num, size_t num_size, double* p_result)
 {
-    struct lconv* locale_info;
-    char local_buffer[64];
+    struct lconv* lc;
+    size_t dp_len;
+    char* dp;
     char* buffer;
 
     /* Unfortunately, AFAIK, there is no reasonably easy portable way how to
@@ -1122,33 +1160,32 @@ json_number_to_double(const char* num, size_t num_size, double* p_result)
      * requirements.
      */
 
-    if(num_size + 1 < sizeof(local_buffer)) {
-        /* The number is short enough so we can avoid heap allocation. */
-        buffer = local_buffer;
-    } else {
-        buffer = (char*) malloc(num_size + 1);
-        if(buffer == NULL)
-            return JSON_ERR_OUTOFMEMORY;
-    }
+    lc = localeconv();
+    dp_len = strlen(lc->decimal_point);
 
-    /* Make sure the string is zero-terminated. */
+    buffer = (char*) MALLOCA(num_size + dp_len + 1);
+    if(buffer == NULL)
+        return JSON_ERR_OUTOFMEMORY;
+
     memcpy(buffer, num, num_size);
     buffer[num_size] = '\0';
 
-    /* Make sure we use the locale-dependent decimal point. */
-    locale_info = localeconv();
-    if(locale_info->decimal_point[0] != '.') {
-        char* fp;
+    if((dp_len != 1 || lc->decimal_point[0] != '.')  &&  (dp = strchr(buffer, '.')) != NULL) {
+        size_t before_dp_len = (dp - buffer);
+        size_t after_dp_len = num_size - before_dp_len - 1;
 
-        fp = strchr(buffer, '.');
-        if(fp != NULL)
-            *fp = locale_info->decimal_point[0];
+        if(dp_len == 1) {
+            buffer[before_dp_len] = lc->decimal_point[0];
+        } else {
+            /* Some exotic locales may use more than one char as the decimal point. */
+            memmove(buffer + before_dp_len + dp_len, buffer + before_dp_len + 1, after_dp_len + 1);
+            memcpy(buffer + before_dp_len, lc->decimal_point, dp_len);
+        }
     }
 
     *p_result = strtod(buffer, NULL);
 
-    if(buffer != local_buffer)
-        free(buffer);
+    FREEA(buffer);
     return 0;
 }
 
@@ -1210,13 +1247,13 @@ json_dump_double(double dbl, JSON_DUMP_CALLBACK write_func, void* user_data)
 {
     static const char fmt[] = "%.16lg";
     static const size_t extra_bytes = 2;    /* Space reserved for ".0" */
-    struct lconv* locale_info;
+    struct lconv* lc;
     int n;
     char local_buffer[64];
     size_t capacity = sizeof(local_buffer) - extra_bytes;
     char* buffer = local_buffer;
     char* new_buffer;
-    char* fp;
+    char* dp;
     int ret;
 
     while(1) {
@@ -1247,11 +1284,11 @@ json_dump_double(double dbl, JSON_DUMP_CALLBACK write_func, void* user_data)
 
     /* Similar pain as above for strtod(). We need to fight with snprintf() and
      * undo the locale-dependent stuff. */
-    locale_info = localeconv();
+    lc = localeconv();
 
     /* Remove all potential locale-provided thousand separators. */
-    if(locale_info->thousands_sep != NULL  &&  locale_info->thousands_sep[0]) {
-        char* sep = locale_info->thousands_sep;
+    if(lc->thousands_sep != NULL  &&  lc->thousands_sep[0]) {
+        char* sep = lc->thousands_sep;
         size_t sep_len = strlen(sep);
         char* ptr = buffer;
 
@@ -1266,9 +1303,9 @@ json_dump_double(double dbl, JSON_DUMP_CALLBACK write_func, void* user_data)
     }
 
     /* Replace the locale-provided decimal point with '.'. */
-    fp = strchr(buffer, locale_info->decimal_point[0]);
-    if(fp != NULL) {
-        *fp = '.';
+    dp = strchr(buffer, lc->decimal_point[0]);
+    if(dp != NULL) {
+        *dp = '.';
     } else if(strchr(buffer, 'e') == NULL) {
         /* There is no decimal point present and also no 'e', i.e. it's not
          * in the scientific notation, i.e. it looks too much as an integer
