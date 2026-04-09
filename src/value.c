@@ -2,7 +2,7 @@
  * C Reusables
  * <http://github.com/mity/c-reusables>
  *
- * Copyright (c) 2018 Martin Mitas
+ * Copyright (c) 2018 Martin Mitáš
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,6 @@
 
 #include "value.h"
 
-#include <malloc.h>
 #include <string.h>
 
 
@@ -231,22 +230,39 @@ value_is_new(const VALUE* v)
     return (v != NULL  &&  value_type(v) == VALUE_NULL  &&  (v->data[0] & IS_NEW));
 }
 
-VALUE*
-value_path(VALUE* root, const char* path)
+
+static VALUE*
+value_path_ex(VALUE* root, const char* path, int allow_build)
 {
     const char* token_beg = path;
     const char* token_end;
     VALUE* v = root;
 
     while(1) {
+        while(*token_beg == '/')
+            token_beg++;
+
         token_end = token_beg;
-        while(*token_end != '\0'  &&  *token_end != '/')
+        if(*token_end == '\0')
+            return v;
+        if(*token_end == '[')
+            token_end++;
+        while(*token_end != '\0'  &&  *token_end != '/'  &&  *token_end != '[')
             token_end++;
 
-        if(token_end - token_beg > 2  &&  token_beg[0] == '['  &&  token_end[-1] == ']') {
+        if(token_end - token_beg >= 2  &&  token_beg[0] == '['  &&  token_end[-1] == ']') {
+            int sign;
             size_t index = 0;
 
             token_beg++;
+
+            if(token_beg[0] == '-'  ||  token_beg[0] == '+') {
+                sign = (token_beg[0] == '+') ? +1 : -1;
+                token_beg++;
+            } else {
+                sign = (token_end-1 - token_beg > 0) ? +1 : 0;
+            }
+
             while('0' <= *token_beg  &&  *token_beg <= '9') {
                 index = index * 10 + (*token_beg - '0');
                 token_beg++;
@@ -254,19 +270,55 @@ value_path(VALUE* root, const char* path)
             if(*token_beg != ']')
                 return NULL;
 
-            v = value_array_get(v, index);
+            if(allow_build  &&  value_is_new(v)) {
+                if(value_init_array(v) != 0)
+                    return NULL;
+            }
+
+            if(sign < 0) {
+                size_t size = value_array_size(v);
+                if(0 < index  &&  index <= size)
+                    index = size - index;
+                else
+                    return NULL;
+            }
+
+            if(sign == 0  &&  !allow_build)
+                return NULL;
+
+            if(allow_build  &&  sign == 0)
+                v = value_array_append(v);
+            else
+                v = value_array_get(v, index);
         } else if(token_end - token_beg > 0) {
-            v = value_dict_get_(v, token_beg, token_end - token_beg);
+            if(allow_build) {
+                if(value_is_new(v)) {
+                    if(value_init_dict(v) != 0)
+                        return NULL;
+                }
+                v = value_dict_get_or_add_(v, token_beg, token_end - token_beg);
+            } else {
+                v = value_dict_get_(v, token_beg, token_end - token_beg);
+            }
         }
 
         if(v == NULL)
             return NULL;
 
-        if(*token_end == '\0')
-            return v;
-
-        token_beg = token_end+1;
+        token_beg = token_end;
     }
+}
+
+VALUE*
+value_path(VALUE* root, const char* path)
+{
+    return value_path_ex(root, path, 0);
+}
+
+VALUE*
+value_build_path(VALUE* root, const char* path)
+{
+    return value_path_ex(root, path, 1);
 }
 
 
@@ -668,6 +720,35 @@ value_string_length(const VALUE* v)
  *** VALUE_ARRAY ***
  *******************/
 
+/* Mitigate heap fragmentation by rounding buffer allocation sizes to
+ * reasonable numbers. */
+static size_t
+value_array_good_alloc_size(size_t alloc)
+{
+    size_t good_alloc;
+
+    if(alloc <= 16) {
+        good_alloc = 1;
+        while(good_alloc < alloc)
+            good_alloc *= 2;
+    } else {
+        /* For larger buffers, we subtract 32 bytes (== 2*sizeof(VALUE)) as
+         * the libc heap allocator needs some space for internal bookkeeping,
+         * and these would cause that two small blocks cannot fit into a window
+         * previously freed from twice as malloc'ed block.
+         *
+         * (AFAIK, most allocators use 8 or 16 bytes for the purpose, but lets
+         * be little bit more conservative.)
+         */
+        good_alloc = 16;
+        while(good_alloc-2 < alloc)
+            good_alloc *= 2;
+        good_alloc -= 2;
+    }
+
+    return good_alloc;
+}
+
 static ARRAY*
 value_array_payload(VALUE* v)
 {
@@ -739,7 +820,7 @@ value_array_insert(VALUE* v, size_t index)
         return NULL;
 
     if(a->size >= a->alloc) {
-        if(value_array_realloc(a, (a->alloc > 0) ? a->alloc * 2 : 1) != 0)
+        if(value_array_realloc(a, value_array_good_alloc_size(a->alloc + 1)) != 0)
             return NULL;
     }
 
@@ -776,8 +857,8 @@ value_array_remove_range(VALUE* v, size_t index, size_t count)
     }
     a->size -= count;
 
-    if(4 * a->size < a->alloc)
-        value_array_realloc(a, a->alloc / 2);
+    if(a->size < a->alloc / 4)
+        value_array_realloc(a, value_array_good_alloc_size(a->size * 2));
 
     return 0;
 }
@@ -821,13 +902,13 @@ value_dict_payload(VALUE* v)
 static int
 value_dict_default_cmp(const char* key1, size_t len1, const char* key2, size_t len2)
 {
-    /* Comparing lengths 1st might be in general especially if the keys are
-     * long, but it would break value_dict_walk_sorted().
+    /* Comparing lengths 1st might be in general better for performance
+     * (especially when the strings are long) but that would affect
+     * value_dict_walk_sorted().
      *
-     * In most apps keys are short and ASCII. It is nice to follow
-     * lexicographic order at least in such cases as that's what most
-     * people expect. And real world, the keys are usually quite short so
-     * the cost should be acceptable.
+     * In most apps keys tend to be ASCII. It is nice to follow lexicographic
+     * order at least in such cases as that's what most people expect. In real
+     * world, the keys are usually quite short so the cost should be acceptable.
      */
 
     size_t min_len = (len1 < len2) ? len1 : len2;
@@ -1067,7 +1148,8 @@ value_dict_add_(VALUE* v, const char* key, size_t key_len)
     return (value_is_new(res) ? res : NULL);
 }
 
-VALUE* value_dict_add(VALUE* v, const char* key)
+VALUE*
+value_dict_add(VALUE* v, const char* key)
 {
     return value_dict_add_(v, key, strlen(key));
 }
