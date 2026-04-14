@@ -26,7 +26,6 @@
 #include "json.h"
 
 #include <locale.h>     /* localeconv() */
-#include <malloc.h>
 #include <stdio.h>      /* snprintf() */
 #include <stdlib.h>
 #include <string.h>

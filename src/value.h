@@ -2,7 +2,7 @@
  * C Reusables
  * <http://github.com/mity/c-reusables>
  *
- * Copyright (c) 2018 Martin Mitas
+ * Copyright (c) 2018 Martin Mitáš
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -212,12 +212,16 @@ int value_init_double(VALUE* v, double d);
 
 /* Getters.
  *
- * Note you may use any of the getter function for any numeric value. These
- * functions perform required conversions under the hood. The conversion may
- * have have the same side/limitations as C casting.
+ * Note you may use any of the getter functions for any numeric value type.
+ * All these functions are able to perform any required conversion under the
+ * hood.
  *
- * However application may use value_is_compatible() to verify whether the
- * conversion should provide a reasonable result.
+ * Naturally, the conversion may have similar side effects as C casting, such
+ * as an overflow, an underflow or, when converting float/double to any integer
+ * type, a rounding.
+ *
+ * However application may use value_is_compatible() to verify the getter
+ * will provide a reasonable result for the particular value in question.
  */
 int32_t value_int32(const VALUE* v);
 uint32_t value_uint32(const VALUE* v);
