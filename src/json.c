@@ -908,7 +908,9 @@ json_fini(JSON_PARSER* parser, JSON_INPUT_POS* p_pos)
     }
 
     free(parser->nesting_stack);
+    parser->nesting_stack = nullptr;
     free(parser->buf);
+    parser->buf = nullptr;
     return parser->errcode;
 }
 
