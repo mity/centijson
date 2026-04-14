@@ -638,6 +638,7 @@ json_string_automaton(JSON_PARSER* parser, const char* input, size_t size,
             if(ch == 'u') {
                 /* Expecting 4 hex digits. */
                 parser->substate = 0xabcd + 4;
+                parser->codepoint[0] = parser->codepoint[1] = 0;
             } else {
                 switch(ch) {
                     case '\"':  ch = '\"'; break;
