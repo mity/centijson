@@ -675,6 +675,12 @@ test_string_unicode_escape(void)
         { "U+dc00", "\"\\udc00\"", NULL, "\xed\xb0\x80", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
         { "U+dfff", "\"\\udfff\"", NULL, "\xed\xbf\xbf", "\xef\xbf\xbd\xef\xbf\xbd\xef\xbf\xbd" },
 
+
+        /* Multiple surrogates in a string.
+         * (https://github.com/mity/centijson/pull/12) */
+        { "U+d800 U+dc00 U+dbff U+dfff", "\"\\ud800\\udc00\\udbff\\udfff\"",
+          "\xf0\x90\x80\x80\xf4\x8f\xbf\xbf", "\xf0\x90\x80\x80\xf4\x8f\xbf\xbf", "\xf0\x90\x80\x80\xf4\x8f\xbf\xbf" },
+
         { 0 }
     };
 
