@@ -1519,6 +1519,26 @@ test_issue3(void)
     value_fini(&root);
 }
 
+static void
+test_issue13(void)
+{
+    static const char input[] = "{\"\":1}";
+
+    VALUE root;
+    VALUE* v;
+
+    /* An empty object key must parse without passing a NULL pointer to
+     * memcpy() while storing the zero-length key string. */
+    TEST_CHECK(json_dom_parse(input, strlen(input), NULL, 0, &root, NULL) == 0);
+    TEST_CHECK(value_dict_size(&root) == 1);
+
+    v = value_dict_get_(&root, "", 0);
+    if(TEST_CHECK(v != NULL))
+        TEST_CHECK(value_int32(v) == 1);
+
+    value_fini(&root);
+}
+
 
 TEST_LIST = {
     { "pos-tracking",               test_pos_tracking },
@@ -1548,5 +1568,6 @@ TEST_LIST = {
     { "crazy-double",               test_crazy_double },
     { "bug-issue2",                 test_issue2 },
     { "bug-issue3",                 test_issue3 },
+    { "bug-issue13",                test_issue13 },
     { 0 }
 };
