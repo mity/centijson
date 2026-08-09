@@ -8,43 +8,52 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Configure
         run: CFLAGS='--coverage -g -O0' cmake -DCMAKE_BUILD_TYPE=Debug -G 'Unix Makefiles' .
       - name: Build
         run: make VERBOSE=1
       - name: Test
         run: ./test-json
-      - name: Code Coverage Report
-        if: ${{ github.event_name == 'push' }}
-        continue-on-error: true
+      - name: Create coverage report
         run: |
           sudo apt-get install -y lcov
-          lcov --directory . --capture --output-file coverage.info
-          lcov --remove coverage.info '/usr/*' --output-file coverage.info
-          lcov --list coverage.info
-          bash <(curl -s https://codecov.io/bash)
+          lcov --directory . --capture --branch-coverage --output-file coverage.info
+          lcov --list coverage.info --branch-coverage
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   windows-32:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: microsoft/setup-msbuild@v1.3.1
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Dev command prompt
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x86
       - name: Configure
-        run: cmake -DCMAKE_BUILD_TYPE=Release -G "Visual Studio 17 2022" -A Win32 .
+        run: cmake -DCMAKE_BUILD_TYPE=Debug -G "NMake Makefiles" .
       - name: Build
-        run: msbuild.exe centijson.sln /p:Configuration=Release /p:Platform=Win32
+        run: nmake
       - name: Test
-        run: .\Release\test-json.exe
+        run: .\test-json.exe
 
   windows-64:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: microsoft/setup-msbuild@v1.3.1
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Dev command prompt
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
       - name: Configure
-        run: cmake -DCMAKE_BUILD_TYPE=Release -G "Visual Studio 17 2022" -A x64 .
+        run: cmake -DCMAKE_BUILD_TYPE=Release -G "NMake Makefiles" .
       - name: Build
-        run: msbuild.exe centijson.sln /p:Configuration=Release /p:Platform=x64
+        run: nmake
       - name: Test
-        run: .\Release\test-json.exe
+        run: .\test-json.exe
