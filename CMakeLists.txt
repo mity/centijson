@@ -1,6 +1,10 @@
 
 cmake_minimum_required(VERSION 3.30)
-project(centijson C)
+project(centijson
+    VERSION "0.0.1"
+    HOMEPAGE_URL "https://github.com/mity/centijson"
+    LANGUAGES C
+)
 
 
 include(CMakeDependentOption)
