@@ -2,7 +2,7 @@
  * CentiJSON
  * <http://github.com/mity/centijson>
  *
- * Copyright (c) 2018 Martin Mitas
+ * Copyright (c) 2018-2026 Martin Mitáš
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
